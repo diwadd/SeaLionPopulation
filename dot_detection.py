@@ -2,10 +2,11 @@ import cv2
 import numpy as np
 
 TRAIN_DOTTED_DIR = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall/TrainDotted/"
+WHITE_COLOR = (255, 255, 255)
 
-def read_image_detect_dots(image_filename, color="MAGENTA"):
+def read_image_detect_dots(image, color="MAGENTA"):
     """
-    This function reads an jpg files with sea lions.
+    This function takes an RBG image with sea lions.
     The lions should be marked with colored dots.
     
     The colored dots of a given color are detected and an image
@@ -15,7 +16,7 @@ def read_image_detect_dots(image_filename, color="MAGENTA"):
     The colors are detected with appropriate lower and upper RBG
     bounds and a bitwise_and function.
 
-    :param image_filename: String e.g. "/path/to/image/file/image_filename.jpg"
+    :param image:
     :param color: Color of the dots you want to detect.
     :return dotted_image:
     """
@@ -42,7 +43,6 @@ def read_image_detect_dots(image_filename, color="MAGENTA"):
     BROWN_RGB_LOWER_BOUND = np.array([ 0, 37,  75], dtype=np.uint8)
     BROWN_RGB_UPPER_BOUND = np.array([10, 50,  85], dtype=np.uint8)
 
-    image = cv2.imread(image_filename)
     w, h, c = image.shape
 
     mask = None
@@ -84,7 +84,7 @@ def read_image_detect_dots(image_filename, color="MAGENTA"):
     dotted_image = np.zeros((w,h,c), dtype=np.uint8)
     cv2.bitwise_and(image, image, dotted_image, mask=mask)
 
-    cv2.imwrite(image_filename.replace(".jpg", image_post_fix), dotted_image)
+    #cv2.imwrite(image_filename.replace(".jpg", image_post_fix), dotted_image)
 
     return dotted_image
 
@@ -125,7 +125,7 @@ def plot_circles_prototype(dotted_image):
     cv2.imwrite("circle.jpg", dotted_image)
 
 
-def plot_circles(dotted_image):
+def plot_circles(dotted_image, radious=40):
     """
     This function takes as input the output from read_image_detect_dots.
     It detects contours of each dot. The contours are basically a list/numpy array of [x, y]
@@ -138,6 +138,7 @@ def plot_circles(dotted_image):
     A mask image is returned (0 for the background, 1 for the circle). 
 
     :param dotted_image: This is the output from read_image_detect_dots.
+    :param: radious
     :return mask:
     """
 
@@ -150,31 +151,42 @@ def plot_circles(dotted_image):
     for i in range(len(contours)):
         x = contours[i][0][0][0]
         y = contours[i][0][0][1]
-        mask = cv2.circle(mask,(x, y), 100, (255, 255, 255), -1)
+        mask = cv2.circle(mask,(x, y), radious, WHITE_COLOR, -1)
+
+    mask = mask/255.0
 
     return mask
     
 
+def apply_mask(image, mask):
+
+    image[:,:,0] = image[:,:,0]*mask
+    image[:,:,1] = image[:,:,1]*mask
+    image[:,:,2] = image[:,:,2]*mask
+
+    return image
+
+
+
 
 for i in range(0,10 + 1):
 
-    dotted_image_mag = read_image_detect_dots(TRAIN_DOTTED_DIR + str(i) + ".jpg", "MAGENTA")
-    #dotted_image_red = read_image_detect_dots(TRAIN_DOTTED_DIR + str(i) + ".jpg", "RED")
-    #dotted_image_blu = read_image_detect_dots(TRAIN_DOTTED_DIR + str(i) + ".jpg", "BLUE")
-    #dotted_image_gre = read_image_detect_dots(TRAIN_DOTTED_DIR + str(i) + ".jpg", "GREEN")
-    #dotted_image_bro = read_image_detect_dots(TRAIN_DOTTED_DIR + str(i) + ".jpg", "BROWN")
+    image = cv2.imread(TRAIN_DOTTED_DIR + str(i) + ".jpg")
+
+    dotted_image_mag = read_image_detect_dots(image, "MAGENTA")
+    #dotted_image_red = read_image_detect_dots(image, "RED")
+    #dotted_image_blu = read_image_detect_dots(image, "BLUE")
+    #dotted_image_gre = read_image_detect_dots(image, "GREEN")
+    #dotted_image_bro = read_image_detect_dots(image, "BROWN")
 
 #plot_circles_prototype(dotted_image_mag)
 
 mask_mag = plot_circles(dotted_image_mag)
 
+image = apply_mask(image, mask_mag)
 
-cv2.imshow("Detected contours", mask_mag)
-cv2.imwrite("circle.jpg", mask_mag)
-
-
-
-
+cv2.imshow("image", image)
+cv2.imwrite("image.jpg", image)
 
 
 
