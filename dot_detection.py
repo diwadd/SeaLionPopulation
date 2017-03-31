@@ -40,8 +40,8 @@ def read_image_detect_dots(image, color="MAGENTA"):
     GREEN_RGB_UPPER_BOUND = np.array([55, 195, 70], dtype=np.uint8)
 
     DOTTED_IMAGE_BROWN_POSTFIX = "_dots_bro_x.jpg"
-    BROWN_RGB_LOWER_BOUND = np.array([ 0, 37,  75], dtype=np.uint8)
-    BROWN_RGB_UPPER_BOUND = np.array([10, 50,  85], dtype=np.uint8)
+    BROWN_RGB_LOWER_BOUND = np.array([ 0, 37,  70], dtype=np.uint8)
+    BROWN_RGB_UPPER_BOUND = np.array([15, 55,  95], dtype=np.uint8)
 
     w, h, c = image.shape
 
@@ -89,6 +89,111 @@ def read_image_detect_dots(image, color="MAGENTA"):
     return dotted_image
 
 
+def plot_circles_return_mask(dotted_image, radious=40):
+    """
+    This function takes as input the output from read_image_detect_dots.
+    It detects contours of each dot. The contours are basically a list/numpy array of [x, y]
+    coordinates of pixels that surround the dots.
+
+    The first pixels coordinates of the contours are taken and a circle
+    is drawn around this pixel (it suffices to take the first pixel
+    because the dots can be treated as point like).
+
+    A mask image is returned (0 for the background, 1 for the circle). 
+
+    :param dotted_image: This is the output from read_image_detect_dots.
+    :param: radious
+    :return mask:
+    """
+
+    gray_image = cv2.cvtColor(dotted_image, cv2.COLOR_BGR2GRAY)
+
+    _, thresholded_image = cv2.threshold(gray_image, 50, 255, cv2.THRESH_BINARY)
+    _, contours, _ = cv2.findContours(thresholded_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    mask = thresholded_image
+    for i in range(len(contours)):
+        x = contours[i][0][0][0]
+        y = contours[i][0][0][1]
+        mask = cv2.circle(mask,(x, y), radious, WHITE_COLOR, -1)
+
+    mask = mask/255.0
+
+    return mask
+    
+
+def apply_mask(image, mask):
+    """
+    Applies a mask to an image.
+
+    The size of the image should be N x M x 3.
+    The mask should be a N x M array with 0.0 or 1.0 values.
+    
+    :param image:
+    :param mask:
+    :return:
+    """
+
+    image[:,:,0] = image[:,:,0]*mask
+    image[:,:,1] = image[:,:,1]*mask
+    image[:,:,2] = image[:,:,2]*mask
+
+    return image
+
+
+def mask_the_lion_image(image):
+    """
+    Takes an image in which the sea lions are marked with coloered dots.
+
+    Calculates a mask and then applies this mask to the input image.
+    As a result only the lions remain visible in the original image.
+
+    :params image:
+    :return masked_lion_image:
+    "return mask:
+    """
+    w, h, _ = image.shape
+
+    color_list = ["MAGENTA", "RED", "BLUE", "GREEN", "BROWN"]
+
+    # Each lion is marked with a circle.
+    # The radious of the circle is adjusted to the
+    # lion's size.
+    radious_list = [45, 50, 40, 22, 42]
+    mask = np.zeros((w, h))
+
+    for c in range(len(color_list)):       
+
+        dotted_image = read_image_detect_dots(image, color_list[c])
+        
+        mask_of_a_give_color = plot_circles_return_mask(dotted_image, radious=radious_list[c])
+        mask = mask + mask_of_a_give_color
+        
+    mask[mask > 0] = 1.0
+    masked_lion_image = apply_mask(image, mask)
+
+    return masked_lion_image, mask
+
+
+def mask_a_few_lion_images(filename_list):
+
+    n_files = len(filename_list)
+    for i in range(n_files):
+        print("Processed: %f" % ((i + 1)/n_files), end="\r")
+
+        image = cv2.imread(filename_list[i])
+        masked_lion_image, mask = mask_the_lion_image(image)
+
+        cv2.imshow("masked_lion_image", masked_lion_image)
+        masked_lion_image_filename = filename_list[i].replace(".jpg", "_x_masked_lion_image.jpg")
+        cv2.imwrite(masked_lion_image_filename, masked_lion_image)
+
+        cv2.imshow("mask", masked_lion_image)
+        mask_filename = filename_list[i].replace(".jpg", "_x_mask.jpg")
+        cv2.imwrite(mask_filename, 255*mask)
+    print()
+
+
 def plot_circles_prototype(dotted_image):
 
     gray_image = cv2.cvtColor(dotted_image, cv2.COLOR_BGR2GRAY)
@@ -124,51 +229,7 @@ def plot_circles_prototype(dotted_image):
     cv2.imshow("Detected contours", dotted_image)
     cv2.imwrite("circle.jpg", dotted_image)
 
-
-def plot_circles(dotted_image, radious=40):
-    """
-    This function takes as input the output from read_image_detect_dots.
-    It detects contours of each dot. The contours are basically a list/numpy array of [x, y]
-    coordinates of pixels that surround the dots.
-
-    The first pixels coordinates of the contours are taken and a circle
-    is drawn around this pixel (it suffices to take the first pixel
-    because the dots can be treated as point like).
-
-    A mask image is returned (0 for the background, 1 for the circle). 
-
-    :param dotted_image: This is the output from read_image_detect_dots.
-    :param: radious
-    :return mask:
-    """
-
-    gray_image = cv2.cvtColor(dotted_image, cv2.COLOR_BGR2GRAY)
-
-    _, thresholded_image = cv2.threshold(gray_image, 50, 255, cv2.THRESH_BINARY)
-    _, contours, _ = cv2.findContours(thresholded_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
-    mask = thresholded_image
-    for i in range(len(contours)):
-        x = contours[i][0][0][0]
-        y = contours[i][0][0][1]
-        mask = cv2.circle(mask,(x, y), radious, WHITE_COLOR, -1)
-
-    mask = mask/255.0
-
-    return mask
-    
-
-def apply_mask(image, mask):
-
-    image[:,:,0] = image[:,:,0]*mask
-    image[:,:,1] = image[:,:,1]*mask
-    image[:,:,2] = image[:,:,2]*mask
-
-    return image
-
-
-
-
+"""
 for i in range(0,10 + 1):
 
     image = cv2.imread(TRAIN_DOTTED_DIR + str(i) + ".jpg")
@@ -186,10 +247,19 @@ mask_mag = plot_circles(dotted_image_mag)
 image = apply_mask(image, mask_mag)
 
 cv2.imshow("image", image)
+#cv2.waitKey(0)
 cv2.imwrite("image.jpg", image)
+"""
 
+#image = cv2.imread(TRAIN_DOTTED_DIR + "0.jpg")
+#masked_lion_image = mask_the_lion_image(image)
 
+#cv2.imshow("image", masked_lion_image)
+#cv2.imwrite("image.jpg", masked_lion_image)
 
+filename_list = [TRAIN_DOTTED_DIR + str(i) + ".jpg" for i in range(10 + 1)]
+
+mask_a_few_lion_images(filename_list)
 
 
 
