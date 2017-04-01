@@ -22,7 +22,7 @@ def read_image_detect_dots(image, color="MAGENTA"):
     """
 
     # RBG in OpenCV is BGR = [BLUE, GREEN RED]
-
+    # Postfixes are used only for testing purposses.
     DOTTED_IMAGE_MAGENTA_POSTFIX = "_dots_mag_x.jpg"
     MAGENTA_RGB_LOWER_BOUND = np.array([225,  0, 225], dtype=np.uint8)
     MAGENTA_RGB_UPPER_BOUND = np.array([255, 30, 255], dtype=np.uint8)
@@ -43,7 +43,7 @@ def read_image_detect_dots(image, color="MAGENTA"):
     BROWN_RGB_LOWER_BOUND = np.array([ 0, 37,  70], dtype=np.uint8)
     BROWN_RGB_UPPER_BOUND = np.array([15, 55,  95], dtype=np.uint8)
 
-    w, h, c = image.shape
+    h, w, c = image.shape
 
     mask = None
     image_post_fix = None
@@ -81,7 +81,7 @@ def read_image_detect_dots(image, color="MAGENTA"):
     else:
         pass
 
-    dotted_image = np.zeros((w,h,c), dtype=np.uint8)
+    dotted_image = np.zeros((h,w,c), dtype=np.uint8)
     cv2.bitwise_and(image, image, dotted_image, mask=mask)
 
     #cv2.imwrite(image_filename.replace(".jpg", image_post_fix), dotted_image)
@@ -148,11 +148,14 @@ def mask_the_lion_image(image):
     Calculates a mask and then applies this mask to the input image.
     As a result only the lions remain visible in the original image.
 
+    The masked_lion_image that is returned is an image on which only the
+    lions are visible. All other things are black.
+
     :params image:
     :return masked_lion_image:
     "return mask:
     """
-    w, h, _ = image.shape
+    h, w, _ = image.shape
 
     color_list = ["MAGENTA", "RED", "BLUE", "GREEN", "BROWN"]
 
@@ -160,7 +163,7 @@ def mask_the_lion_image(image):
     # The radious of the circle is adjusted to the
     # lion's size.
     radious_list = [45, 50, 40, 22, 42]
-    mask = np.zeros((w, h))
+    mask = np.zeros((h, w))
 
     for c in range(len(color_list)):       
 
@@ -176,6 +179,12 @@ def mask_the_lion_image(image):
 
 
 def mask_a_few_lion_images(filename_list):
+    """
+    Takes a list with image filenames. For each image
+    saves a masked_lion_image and its mask.
+
+    :param filename_list:
+    """
 
     n_files = len(filename_list)
     for i in range(n_files):
@@ -192,6 +201,79 @@ def mask_a_few_lion_images(filename_list):
         mask_filename = filename_list[i].replace(".jpg", "_x_mask.jpg")
         cv2.imwrite(mask_filename, 255*mask)
     print()
+
+
+def slice_the_image_into_patches(image,
+                                 path_h = 400,
+                                 path_w = 400,
+                                 path_c = 3):
+
+    h, w, _ = image.shape
+    print("h: %d, w: %d" % (h, w))
+
+    nh = None
+    nw = None
+
+    hd = (h % path_h)
+    wd = (w % path_w)
+
+    lower_h = h - hd
+    lower_w = w - wd
+
+    upper_h = lower_h + path_h
+    upper_w = lower_w + path_w
+
+    l_h_distance = abs(h - lower_h)
+    l_w_distance = abs(w - lower_w)
+
+    u_h_distance = abs(h - upper_h)
+    u_w_distance = abs(w - upper_w)
+
+    if (u_h_distance <= l_h_distance):
+        nh = upper_h
+    else:
+        nh = lower_h
+
+    if (u_w_distance <= l_w_distance):
+        nw = upper_w
+    else:
+        nw = lower_w
+
+    print("(nh, nw): (%d,%d)" % (nh, nw))
+
+    resized_image = cv2.resize(image, (nw, nh), interpolation = cv2.INTER_LINEAR)
+    cv2.imwrite("resized_image.jpg", resized_image)
+
+    print("resized_image.shape: " + str(resized_image.shape))
+
+    nh_slices = nh//path_h
+    nw_slices = nw//path_w
+    print("Number of slices (nh_slices, nw_slices): (%d, %d)" % (nh_slices, nw_slices))
+
+    patches_list = [[np.zeros((path_h, path_w, path_c)) for j in range(nw_slices)] for i in range(nh_slices)]
+
+    for i in range( nh_slices ):
+        for j in range( nw_slices ):  
+            #print("=== === === === === ===")
+            #print( patches_list[i][j].shape )    
+            #print("(i, j): (%d,%d)" % (i, j))
+            #print("(j*path_h): %d" % (j*path_h))
+            #print("(j*path_h + path_h): %d" % (j*path_h + path_h))
+            #print(resized_image[(i*path_w):(i*path_w + path_w), (j*path_h):(j*path_h + path_h), :].shape)      
+            patches_list[i][j][:,:,:] = resized_image[(i*path_h):(i*path_h + path_h), (j*path_w):(j*path_w + path_w), :]
+
+            cv2.imwrite("x_" + str(path_w) + "_" + str(path_h) + "_%d_%d_image.jpg" % (i, j), patches_list[i][j])
+
+    return patches_list
+
+
+def print_image_sizes(filename_list):
+
+    for i in range(len(filename_list)):
+        image = cv2.imread(filename_list[i])
+        #slice_the_image_into_100_x_100_patches(image)
+        print(image.shape)
+
 
 
 def plot_circles_prototype(dotted_image):
@@ -259,6 +341,10 @@ cv2.imwrite("image.jpg", image)
 
 filename_list = [TRAIN_DOTTED_DIR + str(i) + ".jpg" for i in range(10 + 1)]
 
+image = cv2.imread(filename_list[0])
+slice_the_image_into_patches(image)
+
+print_image_sizes(filename_list)
 mask_a_few_lion_images(filename_list)
 
 
