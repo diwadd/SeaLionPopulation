@@ -1,3 +1,5 @@
+import sys
+
 import cv2
 import numpy as np
 
@@ -89,7 +91,7 @@ def read_image_detect_dots(image, color="MAGENTA"):
     return dotted_image
 
 
-def plot_circles_return_mask(dotted_image, radious=40):
+def plot_circles_return_mask(dotted_image, radious=40, dot_threshold=50):
     """
     This function takes as input the output from read_image_detect_dots.
     It detects contours of each dot. The contours are basically a list/numpy array of [x, y]
@@ -102,13 +104,14 @@ def plot_circles_return_mask(dotted_image, radious=40):
     A mask image is returned (0 for the background, 1 for the circle). 
 
     :param dotted_image: This is the output from read_image_detect_dots.
-    :param: radious
+    :param radious:
+    :param dot_threshold:
     :return mask:
     """
 
     gray_image = cv2.cvtColor(dotted_image, cv2.COLOR_BGR2GRAY)
 
-    _, thresholded_image = cv2.threshold(gray_image, 50, 255, cv2.THRESH_BINARY)
+    _, thresholded_image = cv2.threshold(gray_image, dot_threshold, 255, cv2.THRESH_BINARY)
     _, contours, _ = cv2.findContours(thresholded_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
     mask = thresholded_image
@@ -204,44 +207,44 @@ def mask_a_few_lion_images(filename_list):
 
 
 def slice_the_image_into_patches(image,
-                                 path_h = 400,
-                                 path_w = 400,
-                                 path_c = 3):
+                                 patch_h = 400,
+                                 patch_w = 400,
+                                 patch_c = 3):
     """
-    Takes an image and cuts into patches.
-    The size of the patch is path_h x path_w x path_c.
+    Takes an image and cuts it into patches.
+    The size of the patch is patch_h x patch_w x patch_c.
 
     The function resizes the image before cutting.
     The image dimensions are set to new values so that
-    they are multiples of path_h and path_w.
+    they are multiples of patch_h and patch_w.
 
     The dimenstions are chosen in such a way so that they
-    lie as close as possible to the multiples of path_h and path_w.
+    lie as close as possible to the multiples of patch_h and patch_w.
 
     For example if the image dimension are h = 3744, w = 5616 and we
-    set path_h = 400, path_w = 400 then the new image will have dimensions
+    set patch_h = 400, patch_w = 400 then the new image will have dimensions
     nh = 3600, w = 5600.
 
     A list of the pathes is returned.
     
     :param image:
-    :param path_h:
-    :param path_w:
-    :param path_c:
+    :param patch_h:
+    :param patch_w:
+    :param patch_c:
     :return patches_list:
     """
 
     # Calculating the resized image dimensions.
     h, w, _ = image.shape
 
-    hd = (h % path_h)
-    wd = (w % path_w)
+    hd = (h % patch_h)
+    wd = (w % patch_w)
 
     lower_h = h - hd
     lower_w = w - wd
 
-    upper_h = lower_h + path_h
-    upper_w = lower_w + path_w
+    upper_h = lower_h + patch_h
+    upper_w = lower_w + patch_w
 
     l_h_distance = abs(h - lower_h)
     l_w_distance = abs(w - lower_w)
@@ -264,16 +267,57 @@ def slice_the_image_into_patches(image,
 
     # In the resize the image shape is reverted (w, h) -> (h, w).
     resized_image = cv2.resize(image, (nw, nh), interpolation = cv2.INTER_LINEAR)
-    nh_slices = nh//path_h
-    nw_slices = nw//path_w
-    patches_list = [[np.zeros((path_h, path_w, path_c)) for j in range(nw_slices)] for i in range(nh_slices)]
+    cv2.imwrite("resized_image.jpg", resized_image)
+
+    nh_slices = nh//patch_h
+    nw_slices = nw//patch_w
+    patches_list = [[np.zeros((patch_h, patch_w, patch_c), dtype=np.uint8) for j in range(nw_slices)] for i in range(nh_slices)]
 
     for i in range( nh_slices ):
         for j in range( nw_slices ):  
-            patches_list[i][j][:,:,:] = resized_image[(i*path_h):(i*path_h + path_h), (j*path_w):(j*path_w + path_w), :]
-            #cv2.imwrite("x_" + str(path_w) + "_" + str(path_h) + "_%d_%d_image.jpg" % (i, j), patches_list[i][j])
+            patches_list[i][j][:,:,:] = resized_image[(i*patch_h):(i*patch_h + patch_h), (j*patch_w):(j*patch_w + patch_w), :]
+            #cv2.imwrite("x_" + str(patch_w) + "_" + str(patch_h) + "_%d_%d_image.jpg" % (i, j), patches_list[i][j])
 
     return patches_list
+
+
+def combine_pathes_into_image(patches_list):
+    """
+    Takes a patches_list returned by slice_the_image_into_patches and
+    combines it back into a full image.
+
+    :param patches_list:
+    :return image:
+    """
+
+    nh_slices = len(patches_list)
+    if (nh_slices == 0):
+        sys.exit("The provided pathes_list has zero length!")
+        
+
+    nw_slices = len(patches_list[0])
+    patch_h, patch_w, patch_c = patches_list[0][0].shape
+
+    print("nh_slices: %d, nw_slices: %d" % (nh_slices, nw_slices))
+    print("patch_h: %d, patch_w: %d, patch_c: %d" % (patch_h, patch_w, patch_c))
+
+    h = nh_slices*patch_h
+    w = nw_slices*patch_w
+
+    image = np.zeros((h, w, patch_c), dtype=np.uint8)
+
+    print("image.shape: " + str(image.shape))
+
+    for i in range(nh_slices):
+        for j in range(nw_slices):
+            image[(i*patch_h):(i*patch_h + patch_h), (j*patch_w):(j*patch_w + patch_w), :] = patches_list[i][j][:,:,:]
+
+    #print(image[2000:2010, 2000:2010, 0])
+    #cv2.imwrite("image_combined_from_patches.jpg", image)
+
+    return image
+
+
 
 
 def print_image_sizes(filename_list):
@@ -350,7 +394,9 @@ cv2.imwrite("image.jpg", image)
 filename_list = [TRAIN_DOTTED_DIR + str(i) + ".jpg" for i in range(10 + 1)]
 
 image = cv2.imread(filename_list[0])
-slice_the_image_into_patches(image)
+patches_list = slice_the_image_into_patches(image)
+
+combine_pathes_into_image(patches_list)
 
 print_image_sizes(filename_list)
 mask_a_few_lion_images(filename_list)
