@@ -207,12 +207,32 @@ def slice_the_image_into_patches(image,
                                  path_h = 400,
                                  path_w = 400,
                                  path_c = 3):
+    """
+    Takes an image and cuts into patches.
+    The size of the patch is path_h x path_w x path_c.
 
+    The function resizes the image before cutting.
+    The image dimensions are set to new values so that
+    they are multiples of path_h and path_w.
+
+    The dimenstions are chosen in such a way so that they
+    lie as close as possible to the multiples of path_h and path_w.
+
+    For example if the image dimension are h = 3744, w = 5616 and we
+    set path_h = 400, path_w = 400 then the new image will have dimensions
+    nh = 3600, w = 5600.
+
+    A list of the pathes is returned.
+    
+    :param image:
+    :param path_h:
+    :param path_w:
+    :param path_c:
+    :return patches_list:
+    """
+
+    # Calculating the resized image dimensions.
     h, w, _ = image.shape
-    print("h: %d, w: %d" % (h, w))
-
-    nh = None
-    nw = None
 
     hd = (h % path_h)
     wd = (w % path_w)
@@ -229,6 +249,9 @@ def slice_the_image_into_patches(image,
     u_h_distance = abs(h - upper_h)
     u_w_distance = abs(w - upper_w)
 
+    nh = None
+    nw = None
+
     if (u_h_distance <= l_h_distance):
         nh = upper_h
     else:
@@ -239,30 +262,16 @@ def slice_the_image_into_patches(image,
     else:
         nw = lower_w
 
-    print("(nh, nw): (%d,%d)" % (nh, nw))
-
+    # In the resize the image shape is reverted (w, h) -> (h, w).
     resized_image = cv2.resize(image, (nw, nh), interpolation = cv2.INTER_LINEAR)
-    cv2.imwrite("resized_image.jpg", resized_image)
-
-    print("resized_image.shape: " + str(resized_image.shape))
-
     nh_slices = nh//path_h
     nw_slices = nw//path_w
-    print("Number of slices (nh_slices, nw_slices): (%d, %d)" % (nh_slices, nw_slices))
-
     patches_list = [[np.zeros((path_h, path_w, path_c)) for j in range(nw_slices)] for i in range(nh_slices)]
 
     for i in range( nh_slices ):
         for j in range( nw_slices ):  
-            #print("=== === === === === ===")
-            #print( patches_list[i][j].shape )    
-            #print("(i, j): (%d,%d)" % (i, j))
-            #print("(j*path_h): %d" % (j*path_h))
-            #print("(j*path_h + path_h): %d" % (j*path_h + path_h))
-            #print(resized_image[(i*path_w):(i*path_w + path_w), (j*path_h):(j*path_h + path_h), :].shape)      
             patches_list[i][j][:,:,:] = resized_image[(i*path_h):(i*path_h + path_h), (j*path_w):(j*path_w + path_w), :]
-
-            cv2.imwrite("x_" + str(path_w) + "_" + str(path_h) + "_%d_%d_image.jpg" % (i, j), patches_list[i][j])
+            #cv2.imwrite("x_" + str(path_w) + "_" + str(path_h) + "_%d_%d_image.jpg" % (i, j), patches_list[i][j])
 
     return patches_list
 
@@ -271,7 +280,6 @@ def print_image_sizes(filename_list):
 
     for i in range(len(filename_list)):
         image = cv2.imread(filename_list[i])
-        #slice_the_image_into_100_x_100_patches(image)
         print(image.shape)
 
 
