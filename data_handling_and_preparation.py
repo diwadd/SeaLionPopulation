@@ -1,4 +1,5 @@
 import sys
+import math
 
 import cv2
 import numpy as np
@@ -6,7 +7,7 @@ import numpy as np
 TRAIN_DOTTED_DIR = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall/TrainDotted/"
 WHITE_COLOR = (255, 255, 255)
 
-def read_image_detect_dots(image, color="MAGENTA"):
+def detect_dots_in_image(image, color="MAGENTA"):
     """
     This function takes an RBG image with sea lions.
     The lions should be marked with colored dots.
@@ -171,7 +172,7 @@ def mask_the_lion_image(image):
 
     for c in range(len(color_list)):       
 
-        dotted_image = read_image_detect_dots(image, color_list[c])
+        dotted_image = detect_dots_in_image(image, color_list[c])
         
         mask_of_a_give_color = plot_circles_return_mask(dotted_image, radious=radious_list[c])
         mask = mask + mask_of_a_give_color
@@ -356,6 +357,24 @@ def slice_the_mask_into_patches(mask,
     return patches_list
 
 
+def get_patches_list_dimensions(patches_list):
+    """
+    Returns the dimensions of a patches_list.
+
+    :param patches_list:
+    :return nh_slices, nw_slices:
+    """
+
+    nh_slices = len(patches_list)
+    if (nh_slices == 0):
+        sys.exit("The provided patches_list has zero length!")
+        
+
+    nw_slices = len(patches_list[0])
+
+    return nh_slices, nw_slices
+
+
 
 def combine_pathes_into_image(patches_list, prefix_text = None):
     """
@@ -366,12 +385,7 @@ def combine_pathes_into_image(patches_list, prefix_text = None):
     :return image:
     """
 
-    nh_slices = len(patches_list)
-    if (nh_slices == 0):
-        sys.exit("The provided pathes_list has zero length!")
-        
-
-    nw_slices = len(patches_list[0])
+    nh_slices, nw_slices = get_patches_list_dimensions(patches_list)
     patch_h, patch_w, patch_c = patches_list[0][0].shape
 
     h = nh_slices*patch_h
@@ -388,18 +402,6 @@ def combine_pathes_into_image(patches_list, prefix_text = None):
         cv2.imwrite(prefix_text + "image_combined_from_patches.jpg", image)
 
     return image
-
-
-def get_patches_list_dimensions(patches_list):
-
-    nh_slices = len(patches_list)
-    if (nh_slices == 0):
-        sys.exit("The provided patches_list has zero length!")
-        
-
-    nw_slices = len(patches_list[0])
-
-    return nh_slices, nw_slices
 
 
 
@@ -437,7 +439,13 @@ def combine_pathes_into_mask(patches_list, prefix_text = None):
 def resize_patch(patch, nh, nw):
     """
     Takes a patch and resizes it.
+    This works with any image i.e. instead of
+    patch any image can be passed.
 
+    :param patch:
+    :param nh:
+    :param nw:
+    :return resized_mask_patch:
     """
 
     resized_mask_patch = cv2.resize(patch, (nw, nh), interpolation = cv2.INTER_LINEAR)
@@ -445,7 +453,17 @@ def resize_patch(patch, nh, nw):
     return resized_mask_patch
 
 
-def resize_patches_list_with_masks(patches_list, nh, nw, prefix_text = None):
+def resize_patches_list_with_masks(patches_list, nh, nw):
+    """
+    Takes a list of mask patches and resizes each patch.
+    The new size of the patch is nh x nw.
+    
+    :param patches_list:
+    :param nh:
+    :param nw:
+    :param prefix_text:
+    :return:
+    """
 
     nh_slices, nw_slices = get_patches_list_dimensions(patches_list)
     patch_h, patch_w = patches_list[0][0].shape
@@ -456,12 +474,129 @@ def resize_patches_list_with_masks(patches_list, nh, nw, prefix_text = None):
         for j in range(nw_slices):
             resized_patches_list[i][j] = resize_patch(patches_list[i][j], nh, nw)
 
-            if (prefix_text != None):
+    return resized_patches_list
+
+
+def diff_two_patches_lists_with_masks(patches_list_1, patches_list_2):
+    """
+    Takes two patches_lists and calcualtes 
+    the difference between their elements i.e.
+    patches_list_1[i][j] - patches_list_2[i][j]
+
+    The difference is stored in diff_patches_list which
+    is also returned from this function.
+
+    :param patches_list_1:
+    :param patches_list_2:
+    :param prefix_text:   
+    :return diff_patches_list:
+    """
+
+    nh_slices_1, nw_slices_1 = get_patches_list_dimensions(patches_list_1)
+    nh_slices_2, nw_slices_2 = get_patches_list_dimensions(patches_list_2)
+
+    if (nh_slices_1 != nh_slices_2) or (nw_slices_1 != nw_slices_2):
+        sys.exit("Patches_lists dimension mismatch!")
+
+    patch_h_1, patch_w_1 = patches_list_1[0][0].shape
+    patch_h_2, patch_w_2 = patches_list_2[0][0].shape
+
+    if (patch_h_1 != patch_h_2) or (patch_w_1 != patch_w_2):
+        sys.exit("Patch dimension mismatch!")
+
+
+    diff_patches_list = [[np.zeros((patch_h_1, patch_w_1), dtype=np.uint8) for j in range(nw_slices_1)] for i in range(nh_slices_2)]
+
+    for i in range(nh_slices_1):
+        for j in range(nw_slices_1):
+            diff_patches_list[i][j] = patches_list_1[i][j] - patches_list_2[i][j]
+
+            #if (prefix_text != None):
                 # The values in the mask are between 0.0 and 1.0, To save multiply by 255
                 # to have a gray scale image.
-                cv2.imwrite(prefix_text + str(nw) + "_" + str(nh) + "_%d_%d_resized_mask_path.jpg" % (i, j), 255*resized_patches_list[i][j])
+            #    cv2.imwrite(prefix_text + str(patch_h_1) + "_" + str(patch_h_2) +  "_%d_%d_diff_two_patches.jpg" % (i, j), 255*diff_patches_list[i][j])
 
-    return resized_patches_list
+    return diff_patches_list
+
+
+def apply_mask_patches_list_to_image_patches_list(mask_patches_list,
+                                                  image_patches_list):
+
+    """
+    Take two patches_lists. 
+    The first one should contain masks.
+    The second one should contain images.
+
+    The function applies the masks to the images i.e. invokes
+    apply_mask(image_patches_list[i][j], mask_patches_list[i][j])
+
+    It returns a new patches_list with the masked images.
+
+    :param mask_patches_list:
+    :param image_patches_list:
+    :return patches_list:
+    """
+
+    nh_slices_m, nw_slices_m = get_patches_list_dimensions(mask_patches_list)
+    nh_slices_i, nw_slices_i = get_patches_list_dimensions(image_patches_list)
+
+    if (nh_slices_m != nh_slices_i) or (nw_slices_m != nw_slices_i):
+        sys.exit("Patches_lists dimension mismatch!")
+
+    patch_h_m, patch_w_m = mask_patches_list[0][0].shape
+    patch_h_i, patch_w_i, patch_c = image_patches_list[0][0].shape
+
+    if (patch_h_m != patch_h_i) or (patch_w_m != patch_w_i):
+        sys.exit("Patch dimension mismatch!")
+
+    patches_list = [[np.zeros((patch_h_i, patch_w_i, patch_c), dtype=np.uint8) for j in range(nw_slices_i)] for i in range(nh_slices_i)]
+    
+
+    for i in range(nh_slices_m):
+        for j in range(nw_slices_m):
+
+            # We want to avoid modyfing the original image.
+            patch = np.array(image_patches_list[i][j])
+            patches_list[i][j] = apply_mask(patch, 
+                                            mask_patches_list[i][j])
+
+    return patches_list
+
+
+def save_images_in_patches_list(patches_list, image_filename):
+
+    nh_slices, nw_slices = get_patches_list_dimensions(patches_list)
+
+    if (nh_slices == 0) or (nw_slices == 0):
+        sys.exit("The patches_list has zero dimenssions!")
+
+
+    # Check is patches_list contains masks.
+    # Mask should contain only values between 0 and 1.
+    # Images on the otherhand values between 0 and 255.
+    # Images with values [0,1] will be considered as masks
+    # and rescaled to 255 when saving.
+    is_mask = False
+    max_value = -math.inf
+    for i in range(nh_slices):
+        for j in range(nw_slices):
+            value = np.max(patches_list[i][j])
+    
+            if (value > max_value):
+                max_value = value
+
+    print(image_filename + " max_value: " + str(max_value))
+
+    if (round(max_value, 1) <= 1.0):
+        is_mask = True
+
+    for i in range(nh_slices):
+        for j in range(nw_slices):
+
+            if (is_mask == True):      
+                cv2.imwrite(image_filename + "_" + str(i) + "_" + str(j) + ".jpg", 255*patches_list[i][j])
+            else:
+                cv2.imwrite(image_filename + "_" + str(i) + "_" + str(j) + ".jpg", patches_list[i][j])
 
 
 
@@ -472,44 +607,6 @@ def print_image_sizes(filename_list):
         print(image.shape)
 
 
-
-def plot_circles_prototype(dotted_image):
-
-    gray_image = cv2.cvtColor(dotted_image, cv2.COLOR_BGR2GRAY)
-    cv2.imwrite("gray_image.jpg", gray_image)
-
-    retval, thresholded_image = cv2.threshold(gray_image, 50, 255, cv2.THRESH_BINARY)
-    cv2.imwrite("thresholded_image.jpg", thresholded_image)
-
-    im2, contours, hierarchy = cv2.findContours(thresholded_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
-    print("--- Contours ---")    
-    print(contours)
-    print(type(contours))
-    print(len(contours))
-    print(contours[0])
-    print(contours[0][0])    
-    print(contours[0][0][0])
-    print(contours[0][0][0][0])
-    print(contours[0][0][0][1])
-    print(type(contours[0][0][0][0]))
-
-    x = contours[0][0][0][0]
-    y = contours[0][0][0][1]
-
-    cv2.drawContours(dotted_image, contours, -1, (255, 0, 255), 1)
-
-    cv2.imshow("Detected contours", dotted_image)
-    cv2.imwrite("temp.jpg", dotted_image)
-
-    for i in range(len(contours)):
-        dotted_image = cv2.circle(dotted_image,(contours[i][0][0][0], contours[i][0][0][1]), 200, (255, 255, 255), -1)
-
-    cv2.imshow("Detected contours", dotted_image)
-    cv2.imwrite("circle.jpg", dotted_image)
-
-
-
 if __name__ == '__main__':
 
     """
@@ -517,11 +614,11 @@ if __name__ == '__main__':
 
         image = cv2.imread(TRAIN_DOTTED_DIR + str(i) + ".jpg")
 
-        dotted_image_mag = read_image_detect_dots(image, "MAGENTA")
-        #dotted_image_red = read_image_detect_dots(image, "RED")
-        #dotted_image_blu = read_image_detect_dots(image, "BLUE")
-        #dotted_image_gre = read_image_detect_dots(image, "GREEN")
-        #dotted_image_bro = read_image_detect_dots(image, "BROWN")
+        dotted_image_mag = detect_dots_in_image(image, "MAGENTA")
+        #dotted_image_red = detect_dots_in_image(image, "RED")
+        #dotted_image_blu = detect_dots_in_image(image, "BLUE")
+        #dotted_image_gre = detect_dots_in_image(image, "GREEN")
+        #dotted_image_bro = detect_dots_in_image(image, "BROWN")
 
     #plot_circles_prototype(dotted_image_mag)
 
@@ -543,16 +640,46 @@ if __name__ == '__main__':
     filename_list = [TRAIN_DOTTED_DIR + str(i) + ".jpg" for i in range(10 + 1)]
 
     image = cv2.imread(filename_list[0])
+    cv2.imwrite("original_image.jpg", image)
+
     masked_lion_image, mask = mask_the_lion_image(image)
-    cv2.imwrite("z_mask.jpg", 255*mask)
+    cv2.imwrite("original_mask.jpg", 255*mask)
 
-    image_patches_list = slice_the_image_into_patches(masked_lion_image, 500, 500, prefix_text = "img_")
-    mask_patches_list = slice_the_mask_into_patches(mask, 500, 500, prefix_text = "mask_")
 
-    combine_pathes_into_image(image_patches_list, prefix_text = "img_")
-    combine_pathes_into_mask(mask_patches_list, prefix_text = "mask_")
+    patch_h = 500
+    patch_w = 500
+    image_patches_list = slice_the_image_into_patches(masked_lion_image, patch_h, patch_w)
+    save_images_in_patches_list(image_patches_list, "image_patches_list")
 
-    resize_patches_list_with_masks(mask_patches_list, 300, 150, prefix_text = "a_")
+    mask_patches_list = slice_the_mask_into_patches(mask, patch_h, patch_w)
+    save_images_in_patches_list(mask_patches_list, "mask_patches_list")
+
+
+    combined_image = combine_pathes_into_image(image_patches_list)
+    cv2.imwrite("combined_image.jpg", combined_image)
+
+    combined_mask = combine_pathes_into_mask(mask_patches_list)
+    cv2.imwrite("combined_mask.jpg", 255*combined_mask)
+
+    nh = 30
+    nw = 30
+    resized_patches_list = resize_patches_list_with_masks(mask_patches_list, nh, nw)
+    save_images_in_patches_list(resized_patches_list, "resized_patches_list")
+
+    resized_back_patches_list = resize_patches_list_with_masks(resized_patches_list, patch_h, patch_w)
+    save_images_in_patches_list(resized_back_patches_list, "resized_back_patches_list")
+
+
+
+    diff_patches_list = diff_two_patches_lists_with_masks(mask_patches_list, resized_back_patches_list)
+    save_images_in_patches_list(diff_patches_list, "diff_patches_list")
+
+    images_masked_with_resized_patches_list = apply_mask_patches_list_to_image_patches_list(resized_back_patches_list,
+                                                                                            image_patches_list)
+    save_images_in_patches_list(images_masked_with_resized_patches_list, "1_images_masked_with_resized_patches_list")
+    
+    cv2.imwrite("0_image_patches_list.jpg", image_patches_list[5][4])
+    cv2.imwrite("0_images_masked_with_resized_patches_list.jpg", images_masked_with_resized_patches_list[5][4])
 
     print_image_sizes(filename_list)
     mask_a_few_lion_images(filename_list)
