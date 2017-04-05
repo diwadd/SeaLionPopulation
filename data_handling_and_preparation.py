@@ -580,6 +580,14 @@ def color_augmentation_of_an_image(image, ew, ev, ca_std=0.2):
         delta_image[:, :, i] = delta[i]
 
     augmented_image = augmented_image + delta_image
+    
+    # Adding the delta to the image might cause its
+    # color values (RGB) to go bellow zero
+    # or above one. Here be bring the outliners back into
+    # the interval [0, 1].
+    augmented_image[augmented_image < 0.0] = 0.0
+    augmented_image[augmented_image > 1.0] = 1.0
+
     augmented_image = augmented_image*255.0
 
     return augmented_image
