@@ -517,39 +517,6 @@ def apply_mask_patches_list_to_image_patches_list(mask_patches_list,
     return patches_list
 
 
-def save_images_in_patches_list(patches_list, image_filename):
-
-    nh_slices, nw_slices = get_patches_list_dimensions(patches_list)
-
-    # Check is patches_list contains masks.
-    # Mask should contain only values between 0 and 1.
-    # Images on the otherhand values between 0 and 255.
-    # Images with values [0,1] will be considered as masks
-    # and rescaled to 255 when saving.
-    is_mask = False
-    max_value = -math.inf
-    for i in range(nh_slices):
-        for j in range(nw_slices):
-            value = np.max(patches_list[i][j])
-    
-            if (value > max_value):
-                max_value = value
-
-    print(image_filename + " max_value: " + str(max_value))
-
-    if (round(max_value, 1) <= 1.0):
-        is_mask = True
-
-    for i in range(nh_slices):
-        for j in range(nw_slices):
-
-            if (is_mask == True):      
-                cv2.imwrite(image_filename + "_" + str(i) + "_" + str(j) + ".jpg", 255*patches_list[i][j])
-            else:
-                cv2.imwrite(image_filename + "_" + str(i) + "_" + str(j) + ".jpg", patches_list[i][j])
-
-
-
 def get_data_eigenvalues_and_eigenvectors(filename_list, fraction=1/10):
     """
     Calcualtes the eigen values (ew) and eigen vectors (ev) of an image set.
@@ -671,6 +638,83 @@ def rotate_patches_list(patches_list, rotation_angle):
     return rotated_patches_list
 
 
+def create_collection_of_rotated_patches_lists(patches_list, rotation_angle_array=[0, 90]):
+    """
+    Creates a collection of patches_lists.
+    In each patches_lists the images are rotated according to
+    the values in rotation_angle_array given in deg.
+
+    """
+
+    n_pl_in_collection = len(rotation_angle_array) # pl = patches_lists
+    patches_lists_collection = [patches_list for i in range(n_pl_in_collection)]
+
+    nh_slices, nw_slices = get_patches_list_dimensions(patches_list)
+
+    for c in range(n_pl_in_collection):
+        rotation_angle = rotation_angle_array[c]
+        patches_lists_collection[c] = rotate_patches_list(patches_lists_collection[c], rotation_angle)
+
+    return patches_lists_collection
+
+
+def color_augment_patches_lists_collection(patches_lists_collection, ew, ev, ca_std):
+    """
+    Creates a collection of patches_lists.
+    In each patches_lists the images are color agumented 
+    according to ew, ev, ca_std
+
+    """
+
+    n_pl_in_collection = len(patches_lists_collection) # pl = patches_lists
+
+    for c in range(n_pl_in_collection):
+        patches_lists_collection[c] = color_augment_patches_list(patches_lists_collection[c], ew, ev, ca_std)
+
+    return patches_lists_collection
+
+
+def save_images_in_patches_list(patches_list, image_filename):
+
+    nh_slices, nw_slices = get_patches_list_dimensions(patches_list)
+
+    # Check is patches_list contains masks.
+    # Mask should contain only values between 0 and 1.
+    # Images on the otherhand values between 0 and 255.
+    # Images with values [0,1] will be considered as masks
+    # and rescaled to 255 when saving.
+    is_mask = False
+    max_value = -math.inf
+    for i in range(nh_slices):
+        for j in range(nw_slices):
+            value = np.max(patches_list[i][j])
+    
+            if (value > max_value):
+                max_value = value
+
+    print(image_filename + " max_value: " + str(max_value))
+
+    if (round(max_value, 1) <= 1.0):
+        is_mask = True
+
+    for i in range(nh_slices):
+        for j in range(nw_slices):
+
+            current_image_filename = image_filename + "_" + str(i) + "_" + str(j) + ".jpg"
+            if (is_mask == True):      
+                cv2.imwrite(current_image_filename, 255*patches_list[i][j])
+            else:
+                cv2.imwrite(current_image_filename, patches_list[i][j])
+
+
+def save_collection_of_patches_lists(patches_lists_collection, image_filename_stem):
+
+    n_pl_in_collection = len(patches_lists_collection)
+
+    for c in range(n_pl_in_collection):
+        save_images_in_patches_list(patches_lists_collection[c], "from_collection_number_" + str(c) + "_" + image_filename_stem)
+
+
 def print_image_sizes(filename_list):
 
     for i in range(len(filename_list)):
@@ -691,12 +735,13 @@ if __name__ == '__main__':
     ew, ev = get_data_eigenvalues_and_eigenvectors(filename_list, fraction=1)
     ca_std=0.5
 
-    image = cv2.imread(filename_list[0])
+    image = cv2.imread(filename_list[8])
     augmented_image = color_augmentation_of_an_image(image, ew, ev, ca_std)
     rotated_image = rotate_image(image, rotation_angle=180)
 
     cv2.imwrite("000_1image.jpg", image)
     cv2.imwrite("000_1auimg.jpg", augmented_image)
+    cv2.imwrite("000_1au_img_dif.jpg", image - augmented_image)
     cv2.imwrite("000_1roimg.jpg", rotated_image)
 
     image = cv2.imread(filename_list[0])
@@ -713,42 +758,47 @@ if __name__ == '__main__':
     color_augmented_patches_list = color_augment_patches_list(image_patches_list, ew, ev, ca_std)
     mask_patches_list = slice_the_mask_into_patches(mask, patch_h, patch_w)
 
-    save_images_in_patches_list(image_patches_list, "image_patches_list")
-    save_images_in_patches_list(rotated_patches_list, "rotated_patches_list")
-    save_images_in_patches_list(color_augmented_patches_list, "color_augmented_patches_list")
-    save_images_in_patches_list(mask_patches_list, "mask_patches_list")
+    #save_images_in_patches_list(image_patches_list, "image_patches_list")
+    #save_images_in_patches_list(rotated_patches_list, "rotated_patches_list")
+    #save_images_in_patches_list(color_augmented_patches_list, "color_augmented_patches_list")
+    #save_images_in_patches_list(mask_patches_list, "mask_patches_list")
 
 
     combined_image = combine_pathes_into_image(image_patches_list)
-    cv2.imwrite("combined_image.jpg", combined_image)
+    #cv2.imwrite("combined_image.jpg", combined_image)
 
     combined_mask = combine_pathes_into_mask(mask_patches_list)
-    cv2.imwrite("combined_mask.jpg", 255*combined_mask)
+    #cv2.imwrite("combined_mask.jpg", 255*combined_mask)
 
     nh = 30 # Hight of resized patches (height of labels for the neural network)
     nw = 30 # Width of resized patches (width of labels for the neural network)
     resized_patches_list = resize_patches_list_with_masks(mask_patches_list, nh, nw)
-    save_images_in_patches_list(resized_patches_list, "resized_patches_list")
+    #save_images_in_patches_list(resized_patches_list, "resized_patches_list")
 
     resized_back_patches_list = resize_patches_list_with_masks(resized_patches_list, patch_h, patch_w)
-    save_images_in_patches_list(resized_back_patches_list, "resized_back_patches_list")
+    #save_images_in_patches_list(resized_back_patches_list, "resized_back_patches_list")
 
 
 
     diff_patches_list = diff_two_patches_lists_with_masks(mask_patches_list, resized_back_patches_list)
-    save_images_in_patches_list(diff_patches_list, "diff_patches_list")
+    #save_images_in_patches_list(diff_patches_list, "diff_patches_list")
 
 
     images_masked_with_resized_patches_list = apply_mask_patches_list_to_image_patches_list(resized_back_patches_list,
                                                                                             image_patches_list)
-    save_images_in_patches_list(images_masked_with_resized_patches_list, "1_images_masked_with_resized_patches_list")
+    #save_images_in_patches_list(images_masked_with_resized_patches_list, "1_images_masked_with_resized_patches_list")
     
-    cv2.imwrite("0_image_patches_list.jpg", image_patches_list[5][4])
-    cv2.imwrite("0_images_masked_with_resized_patches_list.jpg", images_masked_with_resized_patches_list[5][4])
+    #cv2.imwrite("0_image_patches_list.jpg", image_patches_list[5][4])
+    #cv2.imwrite("0_images_masked_with_resized_patches_list.jpg", images_masked_with_resized_patches_list[5][4])
 
     print_image_sizes(filename_list)
     mask_a_few_lion_images(filename_list)
 
+    patches_lists_collection = create_collection_of_rotated_patches_lists(image_patches_list, [0, 90, 180, 270])
+    save_collection_of_patches_lists(patches_lists_collection, "collection_check")
+
+    patches_lists_collection = color_augment_patches_lists_collection(patches_lists_collection, ew, ev, ca_std)
+    save_collection_of_patches_lists(patches_lists_collection, "ca_collection_check")
 
 
 
