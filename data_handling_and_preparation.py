@@ -593,7 +593,7 @@ def color_augmentation_of_an_image(image, ew, ev, ca_std=0.2):
     return augmented_image
 
 
-def rotate_image(image, rotation_angle=180):
+def rotate_and_scale_image(image, rotation_angle=180):
     """
     Rotate image about an angle equal to rotation_angle.
 
@@ -604,6 +604,24 @@ def rotate_image(image, rotation_angle=180):
 
     M = cv2.getRotationMatrix2D((w/2, h/2), rotation_angle, scale)
     rotated_image = cv2.warpAffine(image, M, (w, h))
+
+    return rotated_image
+
+
+
+def rotate_and_scale_image(image, 
+                           rotation_angle=180,
+                           scale=1.0):
+    """
+    Rotate image about an angle equal to rotation_angle.
+    Scale the rotate image according to scale.
+
+    """
+
+    h, w, _ = image.shape
+
+    R = cv2.getRotationMatrix2D((w/2, h/2), rotation_angle, scale)
+    rotated_image = cv2.warpAffine(image, R, (w, h))
 
     return rotated_image
 
@@ -641,7 +659,7 @@ def rotate_patches_list(patches_list, rotation_angle):
     rotated_patches_list = [[np.zeros((patch_h, patch_w), dtype=np.uint8) for j in range(nw_slices)] for i in range(nh_slices)]
     for i in range(nh_slices):
         for j in range(nw_slices):
-            rotated_patches_list[i][j] = rotate_image(patches_list[i][j], rotation_angle)
+            rotated_patches_list[i][j] = rotate_and_scale_image(patches_list[i][j], rotation_angle)
     
     return rotated_patches_list
 
@@ -745,7 +763,7 @@ if __name__ == '__main__':
 
     image = cv2.imread(filename_list[8])
     augmented_image = color_augmentation_of_an_image(image, ew, ev, ca_std)
-    rotated_image = rotate_image(image, rotation_angle=180)
+    rotated_image = rotate_and_scale_image(image, rotation_angle=180)
 
     cv2.imwrite("000_1image.jpg", image)
     cv2.imwrite("000_1auimg.jpg", augmented_image)
@@ -767,7 +785,7 @@ if __name__ == '__main__':
     mask_patches_list = slice_the_mask_into_patches(mask, patch_h, patch_w)
 
     #save_images_in_patches_list(image_patches_list, "image_patches_list")
-    #save_images_in_patches_list(rotated_patches_list, "rotated_patches_list")
+    save_images_in_patches_list(rotated_patches_list, "rotated_patches_list")
     #save_images_in_patches_list(color_augmented_patches_list, "color_augmented_patches_list")
     #save_images_in_patches_list(mask_patches_list, "mask_patches_list")
 
@@ -803,10 +821,10 @@ if __name__ == '__main__':
     mask_a_few_lion_images(filename_list)
 
     patches_lists_collection = create_collection_of_rotated_patches_lists(image_patches_list, [0, 90, 180, 270])
-    save_collection_of_patches_lists(patches_lists_collection, "collection_check")
+    #save_collection_of_patches_lists(patches_lists_collection, "collection_check")
 
     patches_lists_collection = color_augment_patches_lists_collection(patches_lists_collection, ew, ev, ca_std)
-    save_collection_of_patches_lists(patches_lists_collection, "ca_collection_check")
+    #save_collection_of_patches_lists(patches_lists_collection, "ca_collection_check")
 
 
 
