@@ -8,6 +8,25 @@ import numpy as np
 TRAIN_DOTTED_DIR = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall/TrainDotted/"
 WHITE_COLOR = (255, 255, 255)
 
+
+class SAP:
+    """
+    Static Augmentation Parameters.
+    The training data is augmented and save on the hard drive.
+    The save images can be rotated and scaled.
+    It's static because these poeration will not be performed
+    during training.
+
+    This class is a short hand to represent the augmented
+    parameters i.e. the rotation angle (ang) and scale (scl).
+
+    """
+
+    def __init__(self, ang, scl):
+        self.rotation_angle = ang
+        self.scale = scl
+
+
 def detect_dots_in_image(image, color="MAGENTA"):
     """
     This function takes an RBG image with sea lions.
@@ -409,6 +428,35 @@ def combine_pathes_into_mask(patches_list, prefix_text = None):
     return mask
 
 
+def is_mask_patches_list(patches_list):
+    """
+    Check if patches_list contains masks.
+    Mask should contain only values between 0 and 1.
+    Images on the otherhand values between 0 and 255.
+    Images with values [0,1] will be considered as masks
+    and rescaled to 255 when saving.
+
+    """
+
+    nh_slices, nw_slices = get_patches_list_dimensions(patches_list)
+
+    is_mask = False
+    max_value = -math.inf
+    for i in range(nh_slices):
+        for j in range(nw_slices):
+            value = np.max(patches_list[i][j])
+    
+            if (value > max_value):
+                max_value = value
+
+    print("max_value: " + str(max_value))
+
+    if (round(max_value, 1) <= 1.0):
+        is_mask = True
+
+    return is_mask
+
+
 def resize_patch(patch, nh, nw):
     """
     Takes a patch and resizes it.
@@ -422,17 +470,25 @@ def resize_patch(patch, nh, nw):
     return resized_mask_patch
 
 
-def resize_patches_list_with_masks(patches_list, nh, nw):
+
+def resize_patches_in_patches_list(patches_list, nh, nw):
     """
     Takes a list of mask patches and resizes each patch.
     The new size of the patch is nh x nw.
     
     """
 
+    is_mask = is_mask_patches_list(patches_list)
     nh_slices, nw_slices = get_patches_list_dimensions(patches_list)
-    patch_h, patch_w = patches_list[0][0].shape
-    
-    resized_patches_list = [[np.zeros((nh, nw), dtype=np.uint8) for j in range(nw_slices)] for i in range(nh_slices)]
+
+    resized_patches_list = None
+
+    if (is_mask == True):
+        resized_patches_list = [[np.zeros((nh, nw), dtype=np.uint8) for j in range(nw_slices)] for i in range(nh_slices)]
+    else:
+        _, _, patch_c = patches_list[0][0].shape
+        resized_patches_list = [[np.zeros((nh, nw, patch_c), dtype=np.uint8) for j in range(nw_slices)] for i in range(nh_slices)]        
+
 
     for i in range(nh_slices):
         for j in range(nw_slices):
@@ -557,20 +613,21 @@ def get_data_eigenvalues_and_eigenvectors(filename_list, fraction=1/10):
 
     return ew, ev
 
-
-def color_augmentation_of_an_image(image, ew, ev, ca_std=0.2):
+def ref_color_augmentation_of_an_image(image, ew, ev, ca_std=0.2):
     """
     Apply color augmentation to an image as in Krizhevsky et al. 2012
 
+    This function is meant to be used for one the fly (online) data
+    augumentation during training.
+
     ew - eigen values returned by get_data_eigenvalues_and_eigenvectors.
     ev - eigen vectors returned by get_data_eigenvalues_and_eigenvectors.
-    augmented_image - the intensity of light in the image should be different than in image.
 
     """
 
-    augmented_image = np.array(image)/255.0
+    image = image/255.0
 
-    h, w, c = augmented_image.shape    
+    h, w, c = image.shape    
     
     delta = np.dot(ev, np.transpose((ca_std * np.random.randn(c)) * ew))
 
@@ -579,16 +636,36 @@ def color_augmentation_of_an_image(image, ew, ev, ca_std=0.2):
     for i in range(c):
         delta_image[:, :, i] = delta[i]
 
-    augmented_image = augmented_image + delta_image
+    image = image + delta_image
     
     # Adding the delta to the image might cause its
     # color values (RGB) to go bellow zero
     # or above one. Here be bring the outliners back into
     # the interval [0, 1].
-    augmented_image[augmented_image < 0.0] = 0.0
-    augmented_image[augmented_image > 1.0] = 1.0
+    image[image < 0.0] = 0.0
+    image[image > 1.0] = 1.0
 
-    augmented_image = augmented_image*255.0
+    image = image*255.0
+
+
+def color_augmentation_of_an_image(image, ew, ev, ca_std=0.2):
+    """
+    Apply color augmentation to an image as in Krizhevsky et al. 2012
+    This function is like ref_color_augmentation_of_an_image but returns
+    a augmented_image instead of modifying the one that is passed to it (image).
+    It overcomes passing by reference.
+
+    This function is meant to be used for manual code testing/debuging puropses
+    when we want to compare image with its augumented version (augmented_image). 
+
+    ew - eigen values returned by get_data_eigenvalues_and_eigenvectors.
+    ev - eigen vectors returned by get_data_eigenvalues_and_eigenvectors.
+    augmented_image - the intensity of light in the image should be different than in image.
+
+    """
+
+    augmented_image = np.array(image)/255.0
+    ref_color_augmentation_of_an_image(image, ew, ev, ca_std)
 
     return augmented_image
 
@@ -645,7 +722,7 @@ def color_augment_patches_list(patches_list, ew, ev, ca_std):
     return color_augmented_patches_list
 
 
-def rotate_patches_list(patches_list, rotation_angle):
+def rotate_patches_list(patches_list, rotation_angle=0.0, scale=1.0):
     """
     Apply rotation to all images in a patches_list.
     This function takse only patches_lists with images!
@@ -659,12 +736,13 @@ def rotate_patches_list(patches_list, rotation_angle):
     rotated_patches_list = [[np.zeros((patch_h, patch_w), dtype=np.uint8) for j in range(nw_slices)] for i in range(nh_slices)]
     for i in range(nh_slices):
         for j in range(nw_slices):
-            rotated_patches_list[i][j] = rotate_and_scale_image(patches_list[i][j], rotation_angle)
+            rotated_patches_list[i][j] = rotate_and_scale_image(patches_list[i][j], rotation_angle, scale)
     
     return rotated_patches_list
 
 
-def create_collection_of_rotated_patches_lists(patches_list, rotation_angle_array=[0, 90]):
+def create_collection_of_rotated_patches_lists(patches_list, 
+                                               sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)]):
     """
     Creates a collection of patches_lists.
     In each patches_lists the images are rotated according to
@@ -672,14 +750,15 @@ def create_collection_of_rotated_patches_lists(patches_list, rotation_angle_arra
 
     """
 
-    n_pl_in_collection = len(rotation_angle_array) # pl = patches_lists
+    n_pl_in_collection = len(sap_list) # pl = patches_lists
     patches_lists_collection = [patches_list for i in range(n_pl_in_collection)]
 
     nh_slices, nw_slices = get_patches_list_dimensions(patches_list)
 
     for c in range(n_pl_in_collection):
-        rotation_angle = rotation_angle_array[c]
-        patches_lists_collection[c] = rotate_patches_list(patches_lists_collection[c], rotation_angle)
+        patches_lists_collection[c] = rotate_patches_list(patches_lists_collection[c], 
+                                                          sap_list[c].rotation_angle, 
+                                                          sap_list[c].scale)
 
     return patches_lists_collection
 
@@ -702,26 +781,13 @@ def color_augment_patches_lists_collection(patches_lists_collection, ew, ev, ca_
 
 def save_images_in_patches_list(patches_list, image_filename):
 
-    nh_slices, nw_slices = get_patches_list_dimensions(patches_list)
-
-    # Check is patches_list contains masks.
+    # Check if patches_list contains masks.
     # Mask should contain only values between 0 and 1.
     # Images on the otherhand values between 0 and 255.
     # Images with values [0,1] will be considered as masks
     # and rescaled to 255 when saving.
-    is_mask = False
-    max_value = -math.inf
-    for i in range(nh_slices):
-        for j in range(nw_slices):
-            value = np.max(patches_list[i][j])
-    
-            if (value > max_value):
-                max_value = value
-
-    print(image_filename + " max_value: " + str(max_value))
-
-    if (round(max_value, 1) <= 1.0):
-        is_mask = True
+    is_mask = is_mask_patches_list(patches_list)
+    nh_slices, nw_slices = get_patches_list_dimensions(patches_list)
 
     for i in range(nh_slices):
         for j in range(nw_slices):
@@ -738,7 +804,7 @@ def save_collection_of_patches_lists(patches_lists_collection, image_filename_st
     n_pl_in_collection = len(patches_lists_collection)
 
     for c in range(n_pl_in_collection):
-        save_images_in_patches_list(patches_lists_collection[c], "from_collection_number_" + str(c) + "_" + image_filename_stem)
+        save_images_in_patches_list(patches_lists_collection[c], "c" + str(c) + "from_collection_number_" + image_filename_stem)
 
 
 def print_image_sizes(filename_list):
@@ -784,35 +850,35 @@ if __name__ == '__main__':
     color_augmented_patches_list = color_augment_patches_list(image_patches_list, ew, ev, ca_std)
     mask_patches_list = slice_the_mask_into_patches(mask, patch_h, patch_w)
 
-    #save_images_in_patches_list(image_patches_list, "image_patches_list")
+    save_images_in_patches_list(image_patches_list, "image_patches_list")
     save_images_in_patches_list(rotated_patches_list, "rotated_patches_list")
-    #save_images_in_patches_list(color_augmented_patches_list, "color_augmented_patches_list")
-    #save_images_in_patches_list(mask_patches_list, "mask_patches_list")
+    save_images_in_patches_list(color_augmented_patches_list, "color_augmented_patches_list")
+    save_images_in_patches_list(mask_patches_list, "mask_patches_list")
 
 
     combined_image = combine_pathes_into_image(image_patches_list)
-    #cv2.imwrite("combined_image.jpg", combined_image)
+    cv2.imwrite("combined_image.jpg", combined_image)
 
     combined_mask = combine_pathes_into_mask(mask_patches_list)
-    #cv2.imwrite("combined_mask.jpg", 255*combined_mask)
+    cv2.imwrite("combined_mask.jpg", 255*combined_mask)
 
     nh = 30 # Hight of resized patches (height of labels for the neural network)
     nw = 30 # Width of resized patches (width of labels for the neural network)
-    resized_patches_list = resize_patches_list_with_masks(mask_patches_list, nh, nw)
-    #save_images_in_patches_list(resized_patches_list, "resized_patches_list")
+    resized_patches_list = resize_patches_in_patches_list(mask_patches_list, nh, nw)
+    save_images_in_patches_list(resized_patches_list, "resized_patches_list")
 
-    resized_back_patches_list = resize_patches_list_with_masks(resized_patches_list, patch_h, patch_w)
-    #save_images_in_patches_list(resized_back_patches_list, "resized_back_patches_list")
+    resized_back_patches_list = resize_patches_in_patches_list(resized_patches_list, patch_h, patch_w)
+    save_images_in_patches_list(resized_back_patches_list, "resized_back_patches_list")
 
 
 
     diff_patches_list = diff_two_patches_lists_with_masks(mask_patches_list, resized_back_patches_list)
-    #save_images_in_patches_list(diff_patches_list, "diff_patches_list")
+    save_images_in_patches_list(diff_patches_list, "diff_patches_list")
 
 
     images_masked_with_resized_patches_list = apply_mask_patches_list_to_image_patches_list(resized_back_patches_list,
                                                                                             image_patches_list)
-    #save_images_in_patches_list(images_masked_with_resized_patches_list, "1_images_masked_with_resized_patches_list")
+    save_images_in_patches_list(images_masked_with_resized_patches_list, "1_images_masked_with_resized_patches_list")
     
     #cv2.imwrite("0_image_patches_list.jpg", image_patches_list[5][4])
     #cv2.imwrite("0_images_masked_with_resized_patches_list.jpg", images_masked_with_resized_patches_list[5][4])
@@ -820,7 +886,8 @@ if __name__ == '__main__':
     print_image_sizes(filename_list)
     mask_a_few_lion_images(filename_list)
 
-    patches_lists_collection = create_collection_of_rotated_patches_lists(image_patches_list, [0, 90, 180, 270])
+    patches_lists_collection = create_collection_of_rotated_patches_lists(image_patches_list, 
+                                                                          [SAP(0.0, 1.0), SAP(90.0, 1.0), SAP(180.0, 0.5), SAP(270.0, 0.5)])
     #save_collection_of_patches_lists(patches_lists_collection, "collection_check")
 
     patches_lists_collection = color_augment_patches_lists_collection(patches_lists_collection, ew, ev, ca_std)
