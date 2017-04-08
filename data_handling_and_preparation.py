@@ -11,6 +11,9 @@ import re
 import cv2
 import numpy as np
 
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+
 CONST_TRAIN_DOTTED_IMAGES_DIR = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall/TrainDotted/"
 CONST_TRAIN_IMAGES_DIR = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall/Train/"
 CONST_PREPROCESSED_DATA_DIR = "/home/tadek/Coding/Kaggle/SeaLionPopulation/PreProcessedTrainData/"
@@ -202,7 +205,8 @@ def mask_the_lion_image(image):
     # Each lion is marked with a circle.
     # The radious of the circle is adjusted to the
     # lion's size.
-    radious_list = [45, 50, 40, 22, 42]
+    #radious_list = [45, 50, 40, 22, 42]
+    radious_list = [32, 32, 32, 16, 32]
     mask = np.zeros((h, w))
 
     for c in range(len(color_list)):       
@@ -297,8 +301,7 @@ def get_new_dimensions(h, w, patch_h, patch_w):
 
 def slice_the_image_into_patches(image,
                                  patch_h = 400,
-                                 patch_w = 400,
-                                 prefix_text = None):
+                                 patch_w = 400):
     """
     Takes an image and cuts it into patches.
     The size of the patch is patch_h x patch_w x patch_c.
@@ -312,24 +315,37 @@ def slice_the_image_into_patches(image,
     """
 
     # Calculating the resized image dimensions.
-    h, w, c = image.shape
 
-    nh, nw, nh_slices, nw_slices = get_new_dimensions(h, w, patch_h, patch_w)
+    h = None
+    w = None
+    c = None
+    nh = None
+    nw = None
+    nh_slices = None
+    nw_slices = None
+    patches_list = None
+    try:
+        h, w, c = image.shape
+        nh, nw, nh_slices, nw_slices = get_new_dimensions(h, w, patch_h, patch_w)
+        patches_list = [[np.zeros((patch_h, patch_w, c), dtype=np.uint8) for j in range(nw_slices)] for i in range(nh_slices)]
+    except ValueError:
+        h, w = image.shape
+        nh, nw, nh_slices, nw_slices = get_new_dimensions(h, w, patch_h, patch_w)
+        patches_list = [[np.zeros((patch_h, patch_w), dtype=np.uint8) for j in range(nw_slices)] for i in range(nh_slices)]
+
+
+    
 
     # In the cv2.resize mathod the image shape is reverted (w, h) -> (h, w).
     resized_image = cv2.resize(image, (nw, nh), interpolation = cv2.INTER_LINEAR)
-    
-    if (prefix_text != None):
-        cv2.imwrite(prefix_text + "resized_image.jpg", resized_image)
-
-    patches_list = [[np.zeros((patch_h, patch_w, c), dtype=np.uint8) for j in range(nw_slices)] for i in range(nh_slices)]
 
     for i in range( nh_slices ):
-        for j in range( nw_slices ):  
-            patches_list[i][j][:,:,:] = resized_image[(i*patch_h):(i*patch_h + patch_h), (j*patch_w):(j*patch_w + patch_w), :]
-            
-            if (prefix_text != None):
-                cv2.imwrite(prefix_text + str(patch_w) + "_" + str(patch_h) + "_%d_%d_image.jpg" % (i, j), patches_list[i][j])
+        for j in range( nw_slices ):
+
+            try:  
+                patches_list[i][j][:,:,:] = resized_image[(i*patch_h):(i*patch_h + patch_h), (j*patch_w):(j*patch_w + patch_w), :]
+            except IndexError:
+                patches_list[i][j][:,:] = resized_image[(i*patch_h):(i*patch_h + patch_h), (j*patch_w):(j*patch_w + patch_w)]   
 
     return patches_list
 
@@ -886,12 +902,62 @@ def get_filename_stem(filename):
 
     return filename_stem
 
+
+def display_images_and_masks_in_patches_list(image_patch,
+                                             resized_image_patch,
+                                             masked_dotted_image_patch,
+                                             mask_patch,
+                                             resized_mask_patch,
+                                             back_resized_mask_patch,
+                                             image_masked_with_resized_patch):
+
+    plt.subplot(2,4,1)
+    plt.imshow(cv2.cvtColor(image_patch, cv2.COLOR_BGR2RGB))
+    plt.axis("off")
+    plt.title(str(image_patch.shape))
+
+    plt.subplot(2,4,2)
+    plt.imshow(cv2.cvtColor(resized_image_patch, cv2.COLOR_BGR2RGB))
+    plt.axis("off")
+    plt.title(str(resized_image_patch.shape))
+
+    plt.subplot(2,4,3)
+    plt.imshow(cv2.cvtColor(masked_dotted_image_patch, cv2.COLOR_BGR2RGB))
+    plt.axis("off")
+    plt.title(str(masked_dotted_image_patch.shape))
+
+    plt.subplot(2,4,4)
+    plt.imshow(mask_patch)
+    plt.axis("off")
+    plt.title(str(mask_patch.shape))
+
+    plt.subplot(2,4,5)
+    plt.imshow(resized_mask_patch)
+    plt.axis("off")
+    plt.title(str(resized_mask_patch.shape))
+
+    plt.subplot(2,4,6)
+    plt.imshow(back_resized_mask_patch)
+    plt.axis("off")
+    plt.title(str(back_resized_mask_patch.shape))
+
+    plt.subplot(2,4,7)
+    plt.imshow(cv2.cvtColor(image_masked_with_resized_patch, cv2.COLOR_BGR2RGB))
+    plt.axis("off")
+    plt.title(str(image_masked_with_resized_patch.shape))
+
+    plt.show()
+
+
+
 def prepare_single_image(train_image_filename, 
                          train_dotted_image_filename,
                          patch_h=500,
                          patch_w=500,
-                         resize_patch_to_h=256,
-                         resize_patch_to_w=256,
+                         resize_image_patch_to_h=256,
+                         resize_image_patch_to_w=256,
+                         resize_mask_patch_to_h=64,
+                         resize_mask_patch_to_w=64,
                          ):
 
     train_filename_stem = get_filename_stem(train_image_filename)
@@ -910,14 +976,45 @@ def prepare_single_image(train_image_filename,
         sys.exit("ERROR! Train and train dotted image shapes do not agree.")
 
     image_patches_list = slice_the_image_into_patches(train_image, patch_h, patch_w)
-    resized_image_patches_list = resize_patches_in_patches_list(image_patches_list, resize_patch_to_h, resize_patch_to_w)
+    resized_image_patches_list = resize_patches_in_patches_list(image_patches_list, 
+                                                                resize_image_patch_to_h, 
+                                                                resize_image_patch_to_w)
 
-    #save_images_in_patches_list(image_patches_list, "train_image_patches_list")
+    save_images_in_patches_list(image_patches_list, "train_image_patches_list")
     #save_images_in_patches_list(resized_image_patches_list, "train_resized_image_patches_list")
 
-    dotted_image_patches_list = slice_the_image_into_patches(train_dotted_image, patch_h, patch_w)
-    save_images_in_patches_list(dotted_image_patches_list, "dotted_image_patches_list")
+    masked_lion_image, mask = mask_the_lion_image(train_dotted_image)
 
+    mask_patches_list = slice_the_image_into_patches(mask, patch_h, patch_w)
+    #save_images_in_patches_list(mask_patches_list, "mask_patches_list")
+
+    resized_mask_patches_list = resize_patches_in_patches_list(mask_patches_list, 
+                                                               resize_mask_patch_to_h, 
+                                                               resize_mask_patch_to_w)
+    save_images_in_patches_list(resized_mask_patches_list, "resized_mask_patches_list")
+
+    back_resized_mask_patches_list = resize_patches_in_patches_list(resized_mask_patches_list, 
+                                                                    patch_h, 
+                                                                    patch_w)
+
+
+    masked_dotted_image_patches_list = slice_the_image_into_patches(masked_lion_image, patch_h, patch_w)
+    #save_images_in_patches_list(masked_dotted_image_patches_list, "masked_dotted_image_patches_list")
+
+    images_masked_with_resized_patches_list = apply_mask_patches_list_to_image_patches_list(back_resized_mask_patches_list,
+                                                                                            image_patches_list)
+
+    index_i = 3
+    index_j = 6
+    display_images_and_masks_in_patches_list(image_patches_list[index_i][index_j],
+                                             resized_image_patches_list[index_i][index_j],
+                                             masked_dotted_image_patches_list[index_i][index_j],
+                                             mask_patches_list[index_i][index_j],
+                                             resized_mask_patches_list[index_i][index_j],
+                                             back_resized_mask_patches_list[index_i][index_j],
+                                             images_masked_with_resized_patches_list[index_i][index_j])
+
+    
 
 
 
@@ -1072,8 +1169,8 @@ if __name__ == '__main__':
     print(train_filename_list)
     print(train_dotted_filename_list)
 
-    train_image_filename = train_filename_list[4]
-    train_dotted_image_filename = train_dotted_filename_list[4]
+    train_image_filename = train_filename_list[9]
+    train_dotted_image_filename = train_dotted_filename_list[9]
 
     print(train_image_filename)
     print(train_dotted_image_filename)
