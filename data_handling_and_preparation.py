@@ -1,12 +1,37 @@
 import sys
 import math
 import random
+import os
+import pickle
+import glob
+import time
+import shutil
+import re
 
 import cv2
 import numpy as np
 
-TRAIN_DOTTED_DIR = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall/TrainDotted/"
-WHITE_COLOR = (255, 255, 255)
+CONST_TRAIN_DOTTED_IMAGES_DIR = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall/TrainDotted/"
+CONST_TRAIN_IMAGES_DIR = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall/Train/"
+CONST_PREPROCESSED_DATA_DIR = "/home/tadek/Coding/Kaggle/SeaLionPopulation/PreProcessedTrainData/"
+CONST_WHITE_COLOR = (255, 255, 255)
+
+
+def measure_time(func):
+    """
+    Decorator to measure the execution time of a function.
+    """
+    def func_wrapper(*args, **kwargs):
+
+        start = time.time()
+        ret = func(*args, **kwargs)
+        stop = time.time()
+        print("Time spent in function " + func.__name__ + ": " + str(stop - start))
+        
+        return ret
+
+    return func_wrapper
+
 
 
 class SAP:
@@ -135,7 +160,7 @@ def plot_circles_return_mask(dotted_image, radious=40, dot_threshold=50):
     for i in range(len(contours)):
         x = contours[i][0][0][0]
         y = contours[i][0][0][1]
-        mask = cv2.circle(mask,(x, y), radious, WHITE_COLOR, -1)
+        mask = cv2.circle(mask,(x, y), radious, CONST_WHITE_COLOR, -1)
 
     mask = mask/255.0
 
@@ -428,35 +453,6 @@ def combine_pathes_into_mask(patches_list, prefix_text = None):
     return mask
 
 
-def is_mask_patches_list(patches_list):
-    """
-    Check if patches_list contains masks.
-    Mask should contain only values between 0 and 1.
-    Images on the otherhand values between 0 and 255.
-    Images with values [0,1] will be considered as masks
-    and rescaled to 255 when saving.
-
-    """
-
-    nh_slices, nw_slices = get_patches_list_dimensions(patches_list)
-
-    is_mask = False
-    max_value = -math.inf
-    for i in range(nh_slices):
-        for j in range(nw_slices):
-            value = np.max(patches_list[i][j])
-    
-            if (value > max_value):
-                max_value = value
-
-    print("max_value: " + str(max_value))
-
-    if (round(max_value, 1) <= 1.0):
-        is_mask = True
-
-    return is_mask
-
-
 def resize_patch(patch, nh, nw):
     """
     Takes a patch and resizes it.
@@ -478,17 +474,15 @@ def resize_patches_in_patches_list(patches_list, nh, nw):
     
     """
 
-    is_mask = is_mask_patches_list(patches_list)
     nh_slices, nw_slices = get_patches_list_dimensions(patches_list)
 
+    patch_c = None
     resized_patches_list = None
-
-    if (is_mask == True):
-        resized_patches_list = [[np.zeros((nh, nw), dtype=np.uint8) for j in range(nw_slices)] for i in range(nh_slices)]
-    else:
+    try:
         _, _, patch_c = patches_list[0][0].shape
-        resized_patches_list = [[np.zeros((nh, nw, patch_c), dtype=np.uint8) for j in range(nw_slices)] for i in range(nh_slices)]        
-
+        resized_patches_list = [[np.zeros((nh, nw, patch_c), dtype=np.uint8) for j in range(nw_slices)] for i in range(nh_slices)]
+    except ValueError:
+        resized_patches_list = [[np.zeros((nh, nw), dtype=np.uint8) for j in range(nw_slices)] for i in range(nh_slices)]
 
     for i in range(nh_slices):
         for j in range(nw_slices):
@@ -670,22 +664,6 @@ def color_augmentation_of_an_image(image, ew, ev, ca_std=0.2):
     return augmented_image
 
 
-def rotate_and_scale_image(image, rotation_angle=180):
-    """
-    Rotate image about an angle equal to rotation_angle.
-
-    """
-
-    h, w, _ = image.shape
-    scale = 1
-
-    M = cv2.getRotationMatrix2D((w/2, h/2), rotation_angle, scale)
-    rotated_image = cv2.warpAffine(image, M, (w, h))
-
-    return rotated_image
-
-
-
 def rotate_and_scale_image(image, 
                            rotation_angle=180,
                            scale=1.0):
@@ -694,8 +672,12 @@ def rotate_and_scale_image(image,
     Scale the rotate image according to scale.
 
     """
-
-    h, w, _ = image.shape
+    h = None
+    w = None
+    try:
+        h, w, _ = image.shape
+    except ValueError:
+        h, w = image.shape
 
     R = cv2.getRotationMatrix2D((w/2, h/2), rotation_angle, scale)
     rotated_image = cv2.warpAffine(image, R, (w, h))
@@ -731,9 +713,16 @@ def rotate_patches_list(patches_list, rotation_angle=0.0, scale=1.0):
     """
 
     nh_slices, nw_slices = get_patches_list_dimensions(patches_list)
-    patch_h, patch_w, _ = patches_list[0][0].shape
 
-    rotated_patches_list = [[np.zeros((patch_h, patch_w), dtype=np.uint8) for j in range(nw_slices)] for i in range(nh_slices)]
+    rotated_patches_list = None
+    try:
+        patch_h, patch_w, patch_c = patches_list[0][0].shape
+        rotated_patches_list = [[np.zeros((patch_h, patch_w, patch_c), dtype=np.uint8) for j in range(nw_slices)] for i in range(nh_slices)]
+    except ValueError:
+        patch_h, patch_w = patches_list[0][0].shape
+        rotated_patches_list = [[np.zeros((patch_h, patch_w), dtype=np.uint8) for j in range(nw_slices)] for i in range(nh_slices)]  
+
+    
     for i in range(nh_slices):
         for j in range(nw_slices):
             rotated_patches_list[i][j] = rotate_and_scale_image(patches_list[i][j], rotation_angle, scale)
@@ -779,6 +768,36 @@ def color_augment_patches_lists_collection(patches_lists_collection, ew, ev, ca_
     return patches_lists_collection
 
 
+def is_mask_patches_list(patches_list):
+    """
+    Check if patches_list contains masks.
+    Mask should contain only values between 0 and 1.
+    Images on the otherhand values between 0 and 255.
+    Images with values [0,1] will be considered as masks
+    and rescaled to 255 when saving.
+
+    """
+
+    nh_slices, nw_slices = get_patches_list_dimensions(patches_list)
+
+    is_mask = False
+    max_value = -math.inf
+    for i in range(nh_slices):
+        for j in range(nw_slices):
+            value = np.max(patches_list[i][j])
+    
+            if (value > max_value):
+                max_value = value
+
+    print("max_value: " + str(max_value))
+
+    if (round(max_value, 1) <= 1.0):
+        is_mask = True
+
+    return is_mask
+
+
+
 def save_images_in_patches_list(patches_list, image_filename):
 
     # Check if patches_list contains masks.
@@ -814,15 +833,129 @@ def print_image_sizes(filename_list):
         print(image.shape)
 
 
-if __name__ == '__main__':
+def pickle_patches_lists_collection(filename, patches_lists_collection):
 
-    #image = cv2.imread(TRAIN_DOTTED_DIR + "0.jpg")
+    f = open(filename,"wb")
+    pickle.dump(patches_lists_collection, f)
+    f.close()
+
+
+def savez_two_patches_list(filename_stem, mask_patches_list, image_patches_list):
+
+    nh_slices_m, nw_slices_m = get_patches_list_dimensions(mask_patches_list)
+    nh_slices_i, nw_slices_i = get_patches_list_dimensions(image_patches_list)
+
+    for i in range(nh_slices_m):
+        for j in range(nw_slices_m):
+            image_for_save = image_patches_list[i][j]
+            mask_for_save = mask_patches_list[i][j]
+
+            fn = filename_stem + "_i_" + str(i) + "_j_" + str(j) + ".npz"
+            np.savez_compressed(fn, image_for_save, mask_for_save)
+
+
+def savez_patches_list_collection(filename_stem,
+                                  mask_patches_lists_collection,
+                                  image_patches_lists_collection):
+
+    n_pl_in_collection = len(mask_patches_lists_collection)
+
+    for c in range(n_pl_in_collection):
+        fn = filename_stem + "_c_" + str(c)
+        savez_two_patches_list(fn, 
+                               mask_patches_lists_collection[c], 
+                               image_patches_lists_collection[c])
+
+
+def get_filename_list_in_dir(dir_name, file_type="jpg"):
+    
+    tdd = os.path.isdir(dir_name)
+    if (tdd == False):
+        sys.exit("ERROR! Directory does not exist.")
+
+    filename_list = glob.glob(dir_name + "*" + file_type)
+    
+    return filename_list
+
+
+def get_filename_stem(filename):
+
+    filename_stem = filename.split("/")
+    filename_stem = filename_stem[-1].split(".")    
+    filename_stem = filename_stem[0]
+
+    return filename_stem
+
+def prepare_single_image(train_image_filename, 
+                         train_dotted_image_filename,
+                         patch_h=500,
+                         patch_w=500,
+                         resize_patch_to_h=256,
+                         resize_patch_to_w=256,
+                         ):
+
+    train_filename_stem = get_filename_stem(train_image_filename)
+    train_dotted_filename_stem = get_filename_stem(train_dotted_image_filename)
+
+    if (train_filename_stem != train_dotted_filename_stem):
+        sys.exit("ERROR! Filename stems do not agree.")
+
+    train_image = cv2.imread(train_image_filename)
+    train_dotted_image = cv2.imread(train_dotted_image_filename)
+
+    print(train_image.shape)
+    print(train_dotted_image.shape)
+
+    if (train_image.shape != train_dotted_image.shape):
+        sys.exit("ERROR! Train and train dotted image shapes do not agree.")
+
+    image_patches_list = slice_the_image_into_patches(train_image, patch_h, patch_w)
+    resized_image_patches_list = resize_patches_in_patches_list(image_patches_list, resize_patch_to_h, resize_patch_to_w)
+
+    #save_images_in_patches_list(image_patches_list, "train_image_patches_list")
+    #save_images_in_patches_list(resized_image_patches_list, "train_resized_image_patches_list")
+
+    dotted_image_patches_list = slice_the_image_into_patches(train_dotted_image, patch_h, patch_w)
+    save_images_in_patches_list(dotted_image_patches_list, "dotted_image_patches_list")
+
+
+
+
+def dispatch_preprocessed_data(filename_list, preprocessed_data_dir):
+
+    # Check is CONST_PREPROCESSED_DATA_DIR exists.
+    pdd = os.path.isdir(preprocessed_data_dir)
+
+    if (pdd == True):
+        shutil.rmtree(preprocessed_data_dir)
+        os.makedirs(preprocessed_data_dir)
+    else:
+        os.makedirs(preprocessed_data_dir)
+
+    n_files = len(filename_list)
+    for i in range(n_files):
+        pass
+
+
+@measure_time
+def load_files_in_folder(folder_name):
+
+    filename_list = glob.glob(folder_name + "*npz")
+    for f in filename_list:    
+        loaded = np.load(f)
+
+
+
+
+def manual_testing():
+
+    #image = cv2.imread(CONST_TRAIN_DOTTED_IMAGES_DIR + "0.jpg")
     #masked_lion_image = mask_the_lion_image(image)
 
     #cv2.imshow("image", masked_lion_image)
     #cv2.imwrite("image.jpg", masked_lion_image)
 
-    filename_list = [TRAIN_DOTTED_DIR + str(i) + ".jpg" for i in range(10 + 1)]
+    filename_list = [CONST_TRAIN_DOTTED_IMAGES_DIR + str(i) + ".jpg" for i in range(10 + 1)]
 
     ew, ev = get_data_eigenvalues_and_eigenvectors(filename_list, fraction=1)
     ca_std=0.5
@@ -855,6 +988,9 @@ if __name__ == '__main__':
     save_images_in_patches_list(color_augmented_patches_list, "color_augmented_patches_list")
     save_images_in_patches_list(mask_patches_list, "mask_patches_list")
 
+    resized_image_patches_list = resize_patches_in_patches_list(image_patches_list, 256, 256)
+    save_images_in_patches_list(resized_image_patches_list, "z_resized_image_patches_list")
+
 
     combined_image = combine_pathes_into_image(image_patches_list)
     cv2.imwrite("combined_image.jpg", combined_image)
@@ -886,12 +1022,94 @@ if __name__ == '__main__':
     print_image_sizes(filename_list)
     mask_a_few_lion_images(filename_list)
 
-    patches_lists_collection = create_collection_of_rotated_patches_lists(image_patches_list, 
-                                                                          [SAP(0.0, 1.0), SAP(90.0, 1.0), SAP(180.0, 0.5), SAP(270.0, 0.5)])
+    sap_list = [SAP(0.0, 1.0), 
+                SAP(90.0, 1.0), 
+                SAP(180.0, 1.0), 
+                SAP(270.0, 1.0),
+                SAP(0.0, 0.75), 
+                SAP(90.0, 0.75), 
+                SAP(180.0, 0.75), 
+                SAP(270.0, 0.75),
+                SAP(0.0, 0.25), 
+                SAP(90.0, 0.25), 
+                SAP(180.0, 0.25), 
+                SAP(270.0, 0.25),
+                SAP(0.0, 0.5), 
+                SAP(90.0, 0.5), 
+                SAP(180.0, 0.5),
+                SAP(270.0, 0.5)]
+
+    image_patches_lists_collection = create_collection_of_rotated_patches_lists(image_patches_list, sap_list)
     #save_collection_of_patches_lists(patches_lists_collection, "collection_check")
 
-    patches_lists_collection = color_augment_patches_lists_collection(patches_lists_collection, ew, ev, ca_std)
+    mask_patches_lists_collection = create_collection_of_rotated_patches_lists(mask_patches_list, sap_list)
+
+    image_patches_lists_collection = color_augment_patches_lists_collection(image_patches_lists_collection, ew, ev, ca_std)
     #save_collection_of_patches_lists(patches_lists_collection, "ca_collection_check")
+
+
+    #pickle_patches_lists_collection("temp_pickle.pkl", patches_lists_collection)
+    #size_of_collection = sys.getsizeof(patches_lists_collection)
+    #print(size_of_collection)
+
+    #savez_two_patches_list("/home/tadek/Coding/Kaggle/SeaLionPopulation/temp/checking_savez", mask_patches_list, image_patches_list)    
+    
+
+
+    savez_patches_list_collection("/home/tadek/Coding/Kaggle/SeaLionPopulation/temp/checking_savez",
+                                  image_patches_lists_collection,
+                                  mask_patches_lists_collection)
+
+    load_files_in_folder("/home/tadek/Coding/Kaggle/SeaLionPopulation/temp/")
+
+
+
+if __name__ == '__main__':
+
+    train_filename_list = get_filename_list_in_dir(CONST_TRAIN_IMAGES_DIR, file_type="jpg")
+    train_dotted_filename_list = get_filename_list_in_dir(CONST_TRAIN_DOTTED_IMAGES_DIR, file_type="jpg")
+
+    print(train_filename_list)
+    print(train_dotted_filename_list)
+
+    train_image_filename = train_filename_list[4]
+    train_dotted_image_filename = train_dotted_filename_list[4]
+
+    print(train_image_filename)
+    print(train_dotted_image_filename)
+
+    filename_stem_train = get_filename_stem(train_image_filename)
+    filename_stem_train_dotted = get_filename_stem(train_dotted_image_filename)
+    
+    print(filename_stem_train)
+    print(filename_stem_train_dotted)
+
+    prepare_single_image(train_image_filename, train_dotted_image_filename)
+
+    #filename_list = [CONST_TRAIN_DOTTED_IMAGES_DIR + str(i) + ".jpg" for i in range(10 + 1)]
+
+    #dispatch_preprocessed_data(filename_list)
+
+    #manual_testing()
+
+    #filename_list = [CONST_TRAIN_DOTTED_IMAGES_DIR + str(i) + ".jpg" for i in range(10 + 1)]
+
+    #ew, ev = get_data_eigenvalues_and_eigenvectors(filename_list, fraction=1)
+    #ca_std=0.5
+
+    #image = cv2.imread(filename_list[8])
+
+    #patch_h = 500
+    #patch_w = 500
+    #image_patches_list = slice_the_image_into_patches(image, patch_h, patch_w)
+
+
+
+
+
+
+
+
 
 
 
