@@ -1,4 +1,5 @@
 import unittest
+import copy
 
 import numpy as np
 import data_handling_and_preparation as dhap
@@ -108,10 +109,32 @@ class TestDataHandlingAndPreparation(unittest.TestCase):
 
         self.assertTrue(condition)
 
+    
+    def test_color_augmentation_of_an_image(self):
+
+        # Taken from get_data_eigenvalues_and_eigenvectors.
+        # Calculated on small train dotted set.
+        ew = np.array([2.25203663e-02, 1.12768586e-04, 5.72326214e-06]) 
+        ev = np.array([[-0.60305931, -0.69487312,  0.39175351],
+                       [-0.58219364,  0.04767801, -0.81165102],
+                       [-0.54531645,  0.71755011,  0.43330338]])
+
+        ca_std = 0.5
+
+        image = np.random.randint(0, 255 + 1, size=(10, 15, 3))
+        image_copy = copy.deepcopy(image)     
+
+        image = dhap.color_augmentation_of_an_image(image, ew, ev, ca_std)        
+        
+        condition = np.array_equal(image, image_copy)
+        self.assertFalse(condition)
+
 
 
 if __name__ == '__main__':
     unittest.main()
+
+    
 
 
 

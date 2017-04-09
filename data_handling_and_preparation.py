@@ -54,6 +54,11 @@ class SAP:
         self.rotation_angle = ang
         self.scale = scl
 
+    def __str__(self):
+        ra = round(self.rotation_angle, 2)
+        s = round(self.scale, 2)
+        return "ra: %f, s: %f" % (ra, s)
+
 
 def detect_dots_in_image(image, color="MAGENTA"):
     """
@@ -186,7 +191,7 @@ def apply_mask(image, mask):
     return image
 
 
-def mask_the_lion_image(image):
+def mask_the_lion_image(image, radious_list=[45, 50, 40, 22, 42]):
     """
     Takes an image in which the sea lions are marked with coloered dots.
 
@@ -197,16 +202,14 @@ def mask_the_lion_image(image):
     The masked_lion_image that is returned is an image on which only the
     lions are visible. All other things are black.
 
+    Each lion is marked with a circle.
+    The radious of the circle should be adjusted to the
+    lion's size.
+
     """
     h, w, _ = image.shape
 
     color_list = ["MAGENTA", "RED", "BLUE", "GREEN", "BROWN"]
-
-    # Each lion is marked with a circle.
-    # The radious of the circle is adjusted to the
-    # lion's size.
-    #radious_list = [45, 50, 40, 22, 42]
-    radious_list = [32, 32, 32, 16, 32]
     mask = np.zeros((h, w))
 
     for c in range(len(color_list)):       
@@ -239,13 +242,13 @@ def mask_a_few_lion_images(filename_list):
         image = cv2.imread(filename_list[i])
         masked_lion_image, mask = mask_the_lion_image(image)
 
-        cv2.imshow("masked_lion_image", masked_lion_image)
-        masked_lion_image_filename = filename_list[i].replace(".jpg", "_x_masked_lion_image.jpg")
-        cv2.imwrite(masked_lion_image_filename, masked_lion_image)
+        #cv2.imshow("masked_lion_image", masked_lion_image)
+        #masked_lion_image_filename = filename_list[i].replace(".jpg", "_x_masked_lion_image.jpg")
+        #cv2.imwrite(masked_lion_image_filename, masked_lion_image)
 
-        cv2.imshow("mask", masked_lion_image)
-        mask_filename = filename_list[i].replace(".jpg", "_x_mask.jpg")
-        cv2.imwrite(mask_filename, 255*mask)
+        #cv2.imshow("mask", masked_lion_image)
+        #mask_filename = filename_list[i].replace(".jpg", "_x_mask.jpg")
+        #cv2.imwrite(mask_filename, 255*mask)
     print()
 
 
@@ -623,7 +626,8 @@ def get_data_eigenvalues_and_eigenvectors(filename_list, fraction=1/10):
 
     return ew, ev
 
-def ref_color_augmentation_of_an_image(image, ew, ev, ca_std=0.2):
+
+def color_augmentation_of_an_image(image, ew, ev, ca_std=0.2):
     """
     Apply color augmentation to an image as in Krizhevsky et al. 2012
 
@@ -639,10 +643,11 @@ def ref_color_augmentation_of_an_image(image, ew, ev, ca_std=0.2):
 
     h, w, c = image.shape    
     
-    delta = np.dot(ev, np.transpose((ca_std * np.random.randn(c)) * ew))
+    r = np.random.randn(c)
+
+    delta = np.dot(ev, np.transpose((ca_std * r) * ew))
 
     delta_image = np.zeros((h, w, c))
-    
     for i in range(c):
         delta_image[:, :, i] = delta[i]
 
@@ -657,27 +662,7 @@ def ref_color_augmentation_of_an_image(image, ew, ev, ca_std=0.2):
 
     image = image*255.0
 
-
-def color_augmentation_of_an_image(image, ew, ev, ca_std=0.2):
-    """
-    Apply color augmentation to an image as in Krizhevsky et al. 2012
-    This function is like ref_color_augmentation_of_an_image but returns
-    a augmented_image instead of modifying the one that is passed to it (image).
-    It overcomes passing by reference.
-
-    This function is meant to be used for manual code testing/debuging puropses
-    when we want to compare image with its augumented version (augmented_image). 
-
-    ew - eigen values returned by get_data_eigenvalues_and_eigenvectors.
-    ev - eigen vectors returned by get_data_eigenvalues_and_eigenvectors.
-    augmented_image - the intensity of light in the image should be different than in image.
-
-    """
-
-    augmented_image = np.array(image)/255.0
-    ref_color_augmentation_of_an_image(image, ew, ev, ca_std)
-
-    return augmented_image
+    return image
 
 
 def rotate_and_scale_image(image, 
@@ -863,11 +848,12 @@ def savez_two_patches_list(filename_stem, mask_patches_list, image_patches_list)
 
     for i in range(nh_slices_m):
         for j in range(nw_slices_m):
-            image_for_save = image_patches_list[i][j]
-            mask_for_save = mask_patches_list[i][j]
+            # The image vaules are reduced to a [0, 1] interval.
+            image_for_save = (image_patches_list[i][j]/255.0).astype(np.float32)
+            mask_for_save = mask_patches_list[i][j].astype(np.float32)
 
             fn = filename_stem + "_i_" + str(i) + "_j_" + str(j) + ".npz"
-            np.savez_compressed(fn, image_for_save, mask_for_save)
+            np.savez_compressed(fn, image=image_for_save, mask=mask_for_save)
 
 
 def savez_patches_list_collection(filename_stem,
@@ -884,7 +870,12 @@ def savez_patches_list_collection(filename_stem,
 
 
 def get_filename_list_in_dir(dir_name, file_type="jpg"):
-    
+    """
+    Takes a direcotry and returns a list of all files in it
+    that have the extension given by file_type.
+
+    """
+
     tdd = os.path.isdir(dir_name)
     if (tdd == False):
         sys.exit("ERROR! Directory does not exist.")
@@ -910,41 +901,58 @@ def display_images_and_masks_in_patches_list(image_patch,
                                              resized_mask_patch,
                                              back_resized_mask_patch,
                                              image_masked_with_resized_patch):
+    """
+    This functions is used internaly in prepare_single_image to plot
+    the most relevant images (patches) in data preprosessing.
+    
+    """
 
-    plt.subplot(2,4,1)
+    rows = 2
+    cols = 4
+
+    f, axs = plt.subplots(rows, cols, figsize=(20, 12))
+
+    plt.subplot(rows, cols,1)
     plt.imshow(cv2.cvtColor(image_patch, cv2.COLOR_BGR2RGB))
     plt.axis("off")
     plt.title(str(image_patch.shape))
 
-    plt.subplot(2,4,2)
+    plt.subplot(rows, cols,2)
     plt.imshow(cv2.cvtColor(resized_image_patch, cv2.COLOR_BGR2RGB))
     plt.axis("off")
     plt.title(str(resized_image_patch.shape))
 
-    plt.subplot(2,4,3)
+    plt.subplot(rows, cols,3)
     plt.imshow(cv2.cvtColor(masked_dotted_image_patch, cv2.COLOR_BGR2RGB))
     plt.axis("off")
     plt.title(str(masked_dotted_image_patch.shape))
 
-    plt.subplot(2,4,4)
+    plt.subplot(rows, cols,4)
     plt.imshow(mask_patch)
     plt.axis("off")
     plt.title(str(mask_patch.shape))
 
-    plt.subplot(2,4,5)
+    plt.subplot(rows, cols,5)
     plt.imshow(resized_mask_patch)
     plt.axis("off")
     plt.title(str(resized_mask_patch.shape))
 
-    plt.subplot(2,4,6)
+    plt.subplot(rows, cols,6)
     plt.imshow(back_resized_mask_patch)
     plt.axis("off")
     plt.title(str(back_resized_mask_patch.shape))
 
-    plt.subplot(2,4,7)
+    plt.subplot(rows, cols,7)
     plt.imshow(cv2.cvtColor(image_masked_with_resized_patch, cv2.COLOR_BGR2RGB))
     plt.axis("off")
     plt.title(str(image_masked_with_resized_patch.shape))
+
+    dummy_image = np.zeros(back_resized_mask_patch.shape)
+    plt.subplot(rows, cols,8)
+    plt.imshow(dummy_image)
+    plt.axis("off")
+    plt.title(str(dummy_image.shape))
+
 
     plt.show()
 
@@ -958,7 +966,26 @@ def prepare_single_image(train_image_filename,
                          resize_image_patch_to_w=256,
                          resize_mask_patch_to_h=64,
                          resize_mask_patch_to_w=64,
-                         ):
+                         radious_list = [32, 32, 32, 16, 32],
+                         sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)],
+                         interactive_plot=False,
+                         display_every=10):
+
+    """
+    This function prepares the data for the sea lion detection neural network.
+    It takes two files as input:
+    - train_image_filename - is a file from the Train folder.
+    - train_dotted_image_filename - is a file to the corresponding image in the TrainDotted folder.
+    The file names must be given with full paths e.g.
+    train_image_filename = /full/path/to/image/image_name.jpg
+
+    The function returns:
+    - collection_of_resized_image_patches_lists - a collection of lists of image patches with 
+                                                  dimensions (resize_image_patch_to_h x resize_image_patch_to_w) each.
+    - collection_of_resized_mask_patches_lists - a collection of lists of mask patches with dimensions 
+                                                 (resize_mask_patch_to_h x resize_mask_patch_to_w) each.
+
+    """
 
     train_filename_stem = get_filename_stem(train_image_filename)
     train_dotted_filename_stem = get_filename_stem(train_dotted_image_filename)
@@ -969,9 +996,6 @@ def prepare_single_image(train_image_filename,
     train_image = cv2.imread(train_image_filename)
     train_dotted_image = cv2.imread(train_dotted_image_filename)
 
-    print(train_image.shape)
-    print(train_dotted_image.shape)
-
     if (train_image.shape != train_dotted_image.shape):
         sys.exit("ERROR! Train and train dotted image shapes do not agree.")
 
@@ -979,46 +1003,80 @@ def prepare_single_image(train_image_filename,
     resized_image_patches_list = resize_patches_in_patches_list(image_patches_list, 
                                                                 resize_image_patch_to_h, 
                                                                 resize_image_patch_to_w)
-
-    save_images_in_patches_list(image_patches_list, "train_image_patches_list")
-    #save_images_in_patches_list(resized_image_patches_list, "train_resized_image_patches_list")
-
-    masked_lion_image, mask = mask_the_lion_image(train_dotted_image)
-
+    masked_lion_image, mask = mask_the_lion_image(train_dotted_image, radious_list)
     mask_patches_list = slice_the_image_into_patches(mask, patch_h, patch_w)
-    #save_images_in_patches_list(mask_patches_list, "mask_patches_list")
-
     resized_mask_patches_list = resize_patches_in_patches_list(mask_patches_list, 
                                                                resize_mask_patch_to_h, 
                                                                resize_mask_patch_to_w)
-    save_images_in_patches_list(resized_mask_patches_list, "resized_mask_patches_list")
-
-    back_resized_mask_patches_list = resize_patches_in_patches_list(resized_mask_patches_list, 
-                                                                    patch_h, 
-                                                                    patch_w)
 
 
-    masked_dotted_image_patches_list = slice_the_image_into_patches(masked_lion_image, patch_h, patch_w)
-    #save_images_in_patches_list(masked_dotted_image_patches_list, "masked_dotted_image_patches_list")
+    collection_of_image_patches_lists = create_collection_of_rotated_patches_lists(image_patches_list, sap_list)
+    collection_of_resized_image_patches_lists = create_collection_of_rotated_patches_lists(resized_image_patches_list, sap_list)
+    collection_of_mask_patches_lists = create_collection_of_rotated_patches_lists(mask_patches_list, sap_list)
+    collection_of_resized_mask_patches_lists = create_collection_of_rotated_patches_lists(resized_mask_patches_list, sap_list)
 
-    images_masked_with_resized_patches_list = apply_mask_patches_list_to_image_patches_list(back_resized_mask_patches_list,
-                                                                                            image_patches_list)
+    if (interactive_plot == True):
 
-    index_i = 3
-    index_j = 6
-    display_images_and_masks_in_patches_list(image_patches_list[index_i][index_j],
-                                             resized_image_patches_list[index_i][index_j],
-                                             masked_dotted_image_patches_list[index_i][index_j],
-                                             mask_patches_list[index_i][index_j],
-                                             resized_mask_patches_list[index_i][index_j],
-                                             back_resized_mask_patches_list[index_i][index_j],
-                                             images_masked_with_resized_patches_list[index_i][index_j])
-
-    
+        back_resized_mask_patches_list = resize_patches_in_patches_list(resized_mask_patches_list, patch_h, patch_w)
+        masked_dotted_image_patches_list = slice_the_image_into_patches(masked_lion_image, patch_h, patch_w)
+        images_masked_with_resized_patches_list = apply_mask_patches_list_to_image_patches_list(back_resized_mask_patches_list,
+                                                                                                image_patches_list)
 
 
+        collection_of_back_resized_mask_patches_lists = create_collection_of_rotated_patches_lists(back_resized_mask_patches_list, sap_list)
+        collection_of_masked_dotted_image_patches_lists = create_collection_of_rotated_patches_lists(masked_dotted_image_patches_list, sap_list)
+        collection_of_images_masked_with_resized_patches_lists = create_collection_of_rotated_patches_lists(images_masked_with_resized_patches_list, sap_list)
 
-def dispatch_preprocessed_data(filename_list, preprocessed_data_dir):
+        n_pl_in_collection = len(collection_of_images_masked_with_resized_patches_lists)
+        print("Number of patches_lists: %d" % (n_pl_in_collection))
+        for c in range(n_pl_in_collection):
+            nh_slices, nw_slices = get_patches_list_dimensions(collection_of_images_masked_with_resized_patches_lists[c])
+
+            print("Collection: %d, Number of patches: %d" % (c + 1, nh_slices*nw_slices))
+            every_index = 0
+            for index_i in range(nh_slices):
+                for index_j in range(nw_slices):
+
+                    # For a quick inspection we just need to see a few image.
+                    if (every_index % display_every != 0):
+                        every_index += 1
+                        continue
+
+                    ipl = collection_of_image_patches_lists[c][index_i][index_j]
+                    ripl = collection_of_resized_image_patches_lists[c][index_i][index_j]
+                    mdipl = collection_of_masked_dotted_image_patches_lists[c][index_i][index_j]
+                    mpl = collection_of_mask_patches_lists[c][index_i][index_j]
+                    rmpl = collection_of_resized_mask_patches_lists[c][index_i][index_j]
+                    brmpl = collection_of_back_resized_mask_patches_lists[c][index_i][index_j]
+                    imwrpl = collection_of_images_masked_with_resized_patches_lists[c][index_i][index_j]
+
+                    display_images_and_masks_in_patches_list(ipl, ripl, mdipl, mpl, rmpl, brmpl, imwrpl)
+                    every_index += 1
+                
+
+    return collection_of_resized_mask_patches_lists, collection_of_resized_image_patches_lists
+
+
+
+def prepare_and_dispatch_data(train_image_filename_list, 
+                              train_dotted_image_filename_list,
+                              preprocessed_data_dir,
+                              patch_h=500,
+                              patch_w=500,
+                              resize_image_patch_to_h=256,
+                              resize_image_patch_to_w=256,
+                              resize_mask_patch_to_h=64,
+                              resize_mask_patch_to_w=64,
+                              radious_list = [32, 32, 32, 16, 32],
+                              sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)],
+                              interactive_plot=False,
+                              display_every=10):
+    """
+    Take a list of the train images and the train image with color dots.
+    Prepares the data for training according to the provided parameters 
+    and saves them in preprocessed_data_dir.
+ 
+    """
 
     # Check is CONST_PREPROCESSED_DATA_DIR exists.
     pdd = os.path.isdir(preprocessed_data_dir)
@@ -1029,9 +1087,31 @@ def dispatch_preprocessed_data(filename_list, preprocessed_data_dir):
     else:
         os.makedirs(preprocessed_data_dir)
 
-    n_files = len(filename_list)
+    n_files = len(train_image_filename_list)
+    print("Processed: 0.0 %% files.", end="\r")
     for i in range(n_files):
-        pass
+        #ci = collection_of_resized_image_patches_lists
+        #cm = collection_of_resized_mask_patches_lists
+        cm, ci = prepare_single_image(train_image_filename_list[i], 
+                                      train_dotted_image_filename_list[i],
+                                      patch_h,
+                                      patch_w,
+                                      resize_image_patch_to_h,
+                                      resize_image_patch_to_w,
+                                      resize_mask_patch_to_h,
+                                      resize_mask_patch_to_w,
+                                      radious_list,
+                                      sap_list,
+                                      interactive_plot,
+                                      display_every)
+
+
+        filename_stem = get_filename_stem(train_image_filename_list[i])
+        filename_stem = preprocessed_data_dir + filename_stem + "_prep_data"
+
+        savez_patches_list_collection(filename_stem, cm, ci)
+        print("Processed: %f %% files." % ( 100.0*((i + 1)/n_files) ), end="\r")
+    print()
 
 
 @measure_time
@@ -1041,7 +1121,26 @@ def load_files_in_folder(folder_name):
     for f in filename_list:    
         loaded = np.load(f)
 
+def load_single_file(filename):
+    
+    file_exists = os.path.exists(filename)
+    if (file_exists == False):
+        sys.exit("ERROR! The file you provided does not exist!")
 
+
+    loaded_data = np.load(filename)
+    
+    image = loaded_data["image"]
+    mask = loaded_data["mask"]
+
+    print("image.shape: " + str(image.shape))
+    print("mask.shape: " + str(mask.shape))
+
+    img_max = np.max(image)
+    msk_max = np.max(mask)
+
+    print("img_max: " + str(img_max))
+    print("msk_max: " + str(msk_max))
 
 
 def manual_testing():
@@ -1057,14 +1156,16 @@ def manual_testing():
     ew, ev = get_data_eigenvalues_and_eigenvectors(filename_list, fraction=1)
     ca_std=0.5
 
+    print("ew: " + str(ew) + " ev: " + str(ev))
+
     image = cv2.imread(filename_list[8])
     augmented_image = color_augmentation_of_an_image(image, ew, ev, ca_std)
     rotated_image = rotate_and_scale_image(image, rotation_angle=180)
 
     cv2.imwrite("000_1image.jpg", image)
     cv2.imwrite("000_1auimg.jpg", augmented_image)
-    cv2.imwrite("000_1au_img_dif.jpg", image - augmented_image)
-    cv2.imwrite("000_1roimg.jpg", rotated_image)
+    #cv2.imwrite("000_1au_img_dif.jpg", image - augmented_image)
+    #cv2.imwrite("000_1roimg.jpg", rotated_image)
 
     image = cv2.imread(filename_list[0])
     cv2.imwrite("original_image.jpg", image)
@@ -1163,14 +1264,14 @@ def manual_testing():
 
 if __name__ == '__main__':
 
-    train_filename_list = get_filename_list_in_dir(CONST_TRAIN_IMAGES_DIR, file_type="jpg")
-    train_dotted_filename_list = get_filename_list_in_dir(CONST_TRAIN_DOTTED_IMAGES_DIR, file_type="jpg")
+    train_image_filename_list = get_filename_list_in_dir(CONST_TRAIN_IMAGES_DIR, file_type="jpg")
+    train_dotted_image_filename_list = get_filename_list_in_dir(CONST_TRAIN_DOTTED_IMAGES_DIR, file_type="jpg")
 
-    print(train_filename_list)
-    print(train_dotted_filename_list)
+    print(train_image_filename_list)
+    print(train_dotted_image_filename_list)
 
-    train_image_filename = train_filename_list[9]
-    train_dotted_image_filename = train_dotted_filename_list[9]
+    train_image_filename = train_image_filename_list[9]
+    train_dotted_image_filename = train_dotted_image_filename_list[9]
 
     print(train_image_filename)
     print(train_dotted_image_filename)
@@ -1181,8 +1282,27 @@ if __name__ == '__main__':
     print(filename_stem_train)
     print(filename_stem_train_dotted)
 
-    prepare_single_image(train_image_filename, train_dotted_image_filename)
+    preprocessed_data_dir = "/home/tadek/Coding/Kaggle/SeaLionPopulation/temp/"
+    prepare_and_dispatch_data(train_image_filename_list, 
+                              train_dotted_image_filename_list,
+                              preprocessed_data_dir)
 
+
+    load_single_file("/home/tadek/Coding/Kaggle/SeaLionPopulation/temp/1_prep_data_c_1_i_4_j_5.npz")
+    
+    """
+    collection_of_resized_image_patches_lists, collection_of_resized_mask_patches_lists = prepare_single_image(train_image_filename, 
+                                                                                                               train_dotted_image_filename,
+                                                                                                               patch_h=500,
+                                                                                                               patch_w=500,
+                                                                                                               resize_image_patch_to_h=256,
+                                                                                                               resize_image_patch_to_w=256,
+                                                                                                               resize_mask_patch_to_h=64,
+                                                                                                               resize_mask_patch_to_w=64,
+                                                                                                               radious_list = [32, 32, 32, 16, 32],
+                                                                                                               sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)], 
+                                                                                                               interactive_plot=False)
+    """
     #filename_list = [CONST_TRAIN_DOTTED_IMAGES_DIR + str(i) + ".jpg" for i in range(10 + 1)]
 
     #dispatch_preprocessed_data(filename_list)
