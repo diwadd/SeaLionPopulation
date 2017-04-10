@@ -18,6 +18,9 @@ CONST_TRAIN_DOTTED_IMAGES_DIR = "/home/tadek/Coding/Kaggle/SeaLionPopulation/Tra
 CONST_TRAIN_IMAGES_DIR = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall/Train/"
 CONST_PREPROCESSED_DATA_DIR = "/home/tadek/Coding/Kaggle/SeaLionPopulation/PreProcessedTrainData/"
 CONST_WHITE_COLOR = (255, 255, 255)
+CONST_BLUE_COLOR = (255, 0, 0)
+CONST_GREEN_COLOR = (0, 255, 0)
+CONST_RED_COLOR = (0, 0, 255)
 
 
 def measure_time(func):
@@ -57,7 +60,7 @@ class SAP:
     def __str__(self):
         ra = round(self.rotation_angle, 2)
         s = round(self.scale, 2)
-        return "ra: %f, s: %f" % (ra, s)
+        return "rotation angle: %f deg, scale: %f" % (ra, s)
 
 
 def detect_dots_in_image(image, color="MAGENTA"):
@@ -191,7 +194,60 @@ def apply_mask(image, mask):
     return image
 
 
-def mask_the_lion_image(image, radious_list=[45, 50, 40, 22, 42]):
+def draw_poly(image, contour, epsilon=0.01, color=CONST_GREEN_COLOR):
+    arc = cv2.arcLength(contour, True)
+    poly = cv2.approxPolyDP(contour, epsilon * arc, True)
+    cv2.drawContours(image, [poly], -1, color, 1)
+
+
+def get_detected_lions_list(masked_lion_image, dot_threshold=50, h_threshold=10, w_threshold=10):
+
+    gray_image = cv2.cvtColor(masked_lion_image, cv2.COLOR_BGR2GRAY)
+    
+    _, thresholded_image = cv2.threshold(gray_image, dot_threshold, 255, cv2.THRESH_BINARY)
+    _, contours, _ = cv2.findContours(thresholded_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    cv2.imwrite("base_image.jpg", masked_lion_image)
+
+    for c in range(len(contours)):
+        x, y, w, h = cv2.boundingRect(contours[c])
+
+        if (h < h_threshold) or (w < w_threshold):
+            #draw_poly(masked_lion_image, contours[c], color=CONST_BLUE_COLOR)
+            continue
+        """
+        ellipse = cv2.fitEllipse(contours[c])
+        eh, ew, _ = masked_lion_image.shape
+
+        e_mask = np.zeros((eh, ew))
+        cv2.ellipse(e_mask, ellipse, CONST_BLUE_COLOR, -1)
+
+        masked_image = np.array(masked_lion_image)
+        masked_image = apply_mask(masked_image, e_mask)
+
+        e_gray_image = cv2.cvtColor(masked_image, cv2.COLOR_BGR2GRAY)
+        
+        _, e_thresholded_image = cv2.threshold(e_gray_image, dot_threshold, 255, cv2.THRESH_BINARY)
+        _, e_contours, _ = cv2.findContours(e_thresholded_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+        for j in range(len(e_contours)):
+            x, y, w, h = cv2.boundingRect(e_contours[j])
+
+            if (h < h_threshold) or (w < w_threshold):
+                #draw_poly(masked_lion_image, contours[c], color=CONST_BLUE_COLOR)
+                continue
+
+        """
+        lions_image = masked_lion_image[y:(y + h), x:(x + w)]
+        #cv2.imwrite("extracted_lions_c_" + str(c) + "_j_" + str(j) + ".jpg", lions_image)
+
+        cv2.imwrite("x0_extracted_lions_c_" + str(c) + ".jpg", lions_image)
+
+        #draw_poly(masked_lion_image, contours[c], color=CONST_GREEN_COLOR)
+    cv2.imwrite("contours.jpg", masked_lion_image)
+
+
+def mask_the_lion_image(image, radious_list=[45, 50, 40, 22, 42], dot_threshold=50):
     """
     Takes an image in which the sea lions are marked with coloered dots.
 
@@ -216,7 +272,10 @@ def mask_the_lion_image(image, radious_list=[45, 50, 40, 22, 42]):
 
         dotted_image = detect_dots_in_image(image, color_list[c])
         
-        mask_of_a_give_color = plot_circles_return_mask(dotted_image, radious=radious_list[c])
+        mask_of_a_give_color = plot_circles_return_mask(dotted_image,
+                                                        radious=radious_list[c],
+                                                        dot_threshold=dot_threshold)
+
         mask = mask + mask_of_a_give_color
         
     mask[mask > 0] = 1.0
@@ -900,7 +959,8 @@ def display_images_and_masks_in_patches_list(image_patch,
                                              mask_patch,
                                              resized_mask_patch,
                                              back_resized_mask_patch,
-                                             image_masked_with_resized_patch):
+                                             image_masked_with_resized_patch,
+                                             sap):
     """
     This functions is used internaly in prepare_single_image to plot
     the most relevant images (patches) in data preprosessing.
@@ -953,7 +1013,7 @@ def display_images_and_masks_in_patches_list(image_patch,
     plt.axis("off")
     plt.title(str(dummy_image.shape))
 
-
+    plt.suptitle(str(sap))
     plt.show()
 
 
@@ -1004,11 +1064,14 @@ def prepare_single_image(train_image_filename,
                                                                 resize_image_patch_to_h, 
                                                                 resize_image_patch_to_w)
     masked_lion_image, mask = mask_the_lion_image(train_dotted_image, radious_list)
+
+
+    get_detected_lions_list(masked_lion_image, dot_threshold=1)
+
     mask_patches_list = slice_the_image_into_patches(mask, patch_h, patch_w)
     resized_mask_patches_list = resize_patches_in_patches_list(mask_patches_list, 
                                                                resize_mask_patch_to_h, 
                                                                resize_mask_patch_to_w)
-
 
     collection_of_image_patches_lists = create_collection_of_rotated_patches_lists(image_patches_list, sap_list)
     collection_of_resized_image_patches_lists = create_collection_of_rotated_patches_lists(resized_image_patches_list, sap_list)
@@ -1049,10 +1112,13 @@ def prepare_single_image(train_image_filename,
                     rmpl = collection_of_resized_mask_patches_lists[c][index_i][index_j]
                     brmpl = collection_of_back_resized_mask_patches_lists[c][index_i][index_j]
                     imwrpl = collection_of_images_masked_with_resized_patches_lists[c][index_i][index_j]
+                    sap = sap_list[c]
 
-                    display_images_and_masks_in_patches_list(ipl, ripl, mdipl, mpl, rmpl, brmpl, imwrpl)
+                    display_images_and_masks_in_patches_list(ipl, ripl, mdipl, mpl, rmpl, brmpl, imwrpl, sap)
                     every_index += 1
                 
+        #combined_image_masked_with_resized_patches_list = combine_pathes_into_image(images_masked_with_resized_patches_list)
+        #get_detected_lions_list(combined_image_masked_with_resized_patches_list, dot_threshold=1)
 
     return collection_of_resized_mask_patches_lists, collection_of_resized_image_patches_lists
 
@@ -1282,27 +1348,29 @@ if __name__ == '__main__':
     print(filename_stem_train)
     print(filename_stem_train_dotted)
 
-    preprocessed_data_dir = "/home/tadek/Coding/Kaggle/SeaLionPopulation/temp/"
-    prepare_and_dispatch_data(train_image_filename_list, 
-                              train_dotted_image_filename_list,
-                              preprocessed_data_dir)
+    #preprocessed_data_dir = "/home/tadek/Coding/Kaggle/SeaLionPopulation/temp/"
+    #prepare_and_dispatch_data(train_image_filename_list, 
+    #                          train_dotted_image_filename_list,
+    #                          preprocessed_data_dir)
 
 
-    load_single_file("/home/tadek/Coding/Kaggle/SeaLionPopulation/temp/1_prep_data_c_1_i_4_j_5.npz")
+    #load_single_file("/home/tadek/Coding/Kaggle/SeaLionPopulation/temp/1_prep_data_c_1_i_4_j_5.npz")
     
-    """
+    
     collection_of_resized_image_patches_lists, collection_of_resized_mask_patches_lists = prepare_single_image(train_image_filename, 
                                                                                                                train_dotted_image_filename,
                                                                                                                patch_h=500,
                                                                                                                patch_w=500,
-                                                                                                               resize_image_patch_to_h=256,
-                                                                                                               resize_image_patch_to_w=256,
-                                                                                                               resize_mask_patch_to_h=64,
-                                                                                                               resize_mask_patch_to_w=64,
+                                                                                                               resize_image_patch_to_h=192,
+                                                                                                               resize_image_patch_to_w=192,
+                                                                                                               resize_mask_patch_to_h=48,
+                                                                                                               resize_mask_patch_to_w=48,
                                                                                                                radious_list = [32, 32, 32, 16, 32],
                                                                                                                sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)], 
-                                                                                                               interactive_plot=False)
-    """
+                                                                                                               interactive_plot=False,
+                                                                                                               display_every=87)
+    
+
     #filename_list = [CONST_TRAIN_DOTTED_IMAGES_DIR + str(i) + ".jpg" for i in range(10 + 1)]
 
     #dispatch_preprocessed_data(filename_list)
