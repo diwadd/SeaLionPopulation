@@ -200,32 +200,47 @@ def draw_poly(image, contour, epsilon=0.01, color=CONST_GREEN_COLOR):
     cv2.drawContours(image, [poly], -1, color, 1)
 
 
-def get_detected_lions_list(masked_lion_image, dot_threshold=50, h_threshold=10, w_threshold=10):
+def get_detected_lions_list(masked_lion_image, 
+                            dot_threshold=50, 
+                            h_threshold=10, 
+                            w_threshold=10,
+                            rectangle_shape=True):
 
     gray_image = cv2.cvtColor(masked_lion_image, cv2.COLOR_BGR2GRAY)
     
     _, thresholded_image = cv2.threshold(gray_image, dot_threshold, 255, cv2.THRESH_BINARY)
     _, contours, _ = cv2.findContours(thresholded_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-    cv2.imwrite("base_image.jpg", masked_lion_image)
+    #cv2.imwrite("base_image.jpg", masked_lion_image)
 
+    lions_image = None
+    lion_images_list = []
     for c in range(len(contours)):
+        # Find basic rectangle.
         x, y, w, h = cv2.boundingRect(contours[c])
-
+        
+        # Check if its big enough?
         if (h < h_threshold) or (w < w_threshold):
-            #draw_poly(masked_lion_image, contours[c], color=CONST_BLUE_COLOR)
             continue
-        """
+
+        if (rectangle_shape == True):
+            lions_image = masked_lion_image[y:(y + h), x:(x + w)]
+            lion_images_list.append(lions_image)
+            continue
+
+        # This part of the code will find the minimal
+        # spanning eclipse.
+
         ellipse = cv2.fitEllipse(contours[c])
         eh, ew, _ = masked_lion_image.shape
 
         e_mask = np.zeros((eh, ew))
         cv2.ellipse(e_mask, ellipse, CONST_BLUE_COLOR, -1)
 
-        masked_image = np.array(masked_lion_image)
-        masked_image = apply_mask(masked_image, e_mask)
+        e_masked_image = np.array(masked_lion_image)
+        e_masked_image = apply_mask(e_masked_image, e_mask)
 
-        e_gray_image = cv2.cvtColor(masked_image, cv2.COLOR_BGR2GRAY)
+        e_gray_image = cv2.cvtColor(e_masked_image, cv2.COLOR_BGR2GRAY)
         
         _, e_thresholded_image = cv2.threshold(e_gray_image, dot_threshold, 255, cv2.THRESH_BINARY)
         _, e_contours, _ = cv2.findContours(e_thresholded_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -233,18 +248,60 @@ def get_detected_lions_list(masked_lion_image, dot_threshold=50, h_threshold=10,
         for j in range(len(e_contours)):
             x, y, w, h = cv2.boundingRect(e_contours[j])
 
+            # There should be only one e_contour.
+            # However, sometimes small, flanky contours are detected.
+            # We discard them here.
             if (h < h_threshold) or (w < w_threshold):
-                #draw_poly(masked_lion_image, contours[c], color=CONST_BLUE_COLOR)
                 continue
 
-        """
-        lions_image = masked_lion_image[y:(y + h), x:(x + w)]
+            # If the contour is big enough then we found the right one.
+            lions_image = masked_lion_image[y:(y + h), x:(x + w)]
+            lion_images_list.append(lions_image)
+            break
+
+
         #cv2.imwrite("extracted_lions_c_" + str(c) + "_j_" + str(j) + ".jpg", lions_image)
 
-        cv2.imwrite("x0_extracted_lions_c_" + str(c) + ".jpg", lions_image)
+        cv2.imwrite("y0_extracted_lions_c_" + str(c) + ".jpg", lions_image)
 
         #draw_poly(masked_lion_image, contours[c], color=CONST_GREEN_COLOR)
-    cv2.imwrite("contours.jpg", masked_lion_image)
+    #cv2.imwrite("contours.jpg", masked_lion_image)
+    return lion_images_list
+
+
+def count_lions_in_a_single_lion_image(lion_image, radious=15, dot_threshold=1):
+    """
+    Takes a sinle lion image and determins the number of
+    lions in the image. 
+    In principle there should be only one lion on each image.
+    This is however not always true since some times the lions
+    lie very close to one another.
+    Returns an array with the corresponing counts.
+
+    """
+
+    color_list = ["MAGENTA", "RED", "BLUE", "GREEN", "BROWN"]
+    lions_count = [0, 0, 0, 0, 0]
+
+    for c in range(len(color_list)):
+
+        processing_image = np.array(lion_image)
+        processing_image = detect_dots_in_image(processing_image, color=color_list[c])
+
+        # The dots that are detected can be fragmented.
+        # We plot circles around them to make the into one solid block
+        # of pixels. This can be done by the plot_circles_return_mask function.
+        # We multiply by 255 because we want an image not a mask.
+        processing_image = 255.0*plot_circles_return_mask(processing_image, radious=10)
+        
+        gray_image = processing_image.astype(np.uint8) # cv2.cvtColor(processing_image.astype(np.uint8), cv2.COLOR_BGR2GRAY)
+        
+        _, thresholded_image = cv2.threshold(gray_image, dot_threshold, 255, cv2.THRESH_BINARY)
+        _, contours, _ = cv2.findContours(thresholded_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+        lions_count[c] = lions_count[c] + len(contours)
+
+    return lions_count
 
 
 def mask_the_lion_image(image, radious_list=[45, 50, 40, 22, 42], dot_threshold=50):
@@ -300,14 +357,6 @@ def mask_a_few_lion_images(filename_list):
 
         image = cv2.imread(filename_list[i])
         masked_lion_image, mask = mask_the_lion_image(image)
-
-        #cv2.imshow("masked_lion_image", masked_lion_image)
-        #masked_lion_image_filename = filename_list[i].replace(".jpg", "_x_masked_lion_image.jpg")
-        #cv2.imwrite(masked_lion_image_filename, masked_lion_image)
-
-        #cv2.imshow("mask", masked_lion_image)
-        #mask_filename = filename_list[i].replace(".jpg", "_x_mask.jpg")
-        #cv2.imwrite(mask_filename, 255*mask)
     print()
 
 
@@ -1018,18 +1067,18 @@ def display_images_and_masks_in_patches_list(image_patch,
 
 
 
-def prepare_single_image(train_image_filename, 
-                         train_dotted_image_filename,
-                         patch_h=500,
-                         patch_w=500,
-                         resize_image_patch_to_h=256,
-                         resize_image_patch_to_w=256,
-                         resize_mask_patch_to_h=64,
-                         resize_mask_patch_to_w=64,
-                         radious_list = [32, 32, 32, 16, 32],
-                         sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)],
-                         interactive_plot=False,
-                         display_every=10):
+def prepare_single_full_input_image(train_image_filename, 
+                                    train_dotted_image_filename,
+                                    patch_h=500,
+                                    patch_w=500,
+                                    resize_image_patch_to_h=256,
+                                    resize_image_patch_to_w=256,
+                                    resize_mask_patch_to_h=64,
+                                    resize_mask_patch_to_w=64,
+                                    radious_list = [32, 32, 32, 16, 32],
+                                    sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)],
+                                    interactive_plot=False,
+                                    display_every=10):
 
     """
     This function prepares the data for the sea lion detection neural network.
@@ -1065,8 +1114,6 @@ def prepare_single_image(train_image_filename,
                                                                 resize_image_patch_to_w)
     masked_lion_image, mask = mask_the_lion_image(train_dotted_image, radious_list)
 
-
-    get_detected_lions_list(masked_lion_image, dot_threshold=1)
 
     mask_patches_list = slice_the_image_into_patches(mask, patch_h, patch_w)
     resized_mask_patches_list = resize_patches_in_patches_list(mask_patches_list, 
@@ -1123,7 +1170,6 @@ def prepare_single_image(train_image_filename,
     return collection_of_resized_mask_patches_lists, collection_of_resized_image_patches_lists
 
 
-
 def prepare_and_dispatch_data(train_image_filename_list, 
                               train_dotted_image_filename_list,
                               preprocessed_data_dir,
@@ -1158,7 +1204,7 @@ def prepare_and_dispatch_data(train_image_filename_list,
     for i in range(n_files):
         #ci = collection_of_resized_image_patches_lists
         #cm = collection_of_resized_mask_patches_lists
-        cm, ci = prepare_single_image(train_image_filename_list[i], 
+        cm, ci = prepare_single_full_input_image(train_image_filename_list[i], 
                                       train_dotted_image_filename_list[i],
                                       patch_h,
                                       patch_w,
@@ -1207,6 +1253,36 @@ def load_single_file(filename):
 
     print("img_max: " + str(img_max))
     print("msk_max: " + str(msk_max))
+
+
+
+def manual_test_of_lion_counting(train_image_filename, 
+                                 train_dotted_image_filename,
+                                 patch_h=500,
+                                 patch_w=500,
+                                 resize_image_patch_to_h=256,
+                                 resize_image_patch_to_w=256,
+                                 resize_mask_patch_to_h=64,
+                                 resize_mask_patch_to_w=64,
+                                 radious_list = [32, 32, 32, 16, 32],
+                                 sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)],
+                                 interactive_plot=False,
+                                 display_every=10):
+
+    train_dotted_image = cv2.imread(train_dotted_image_filename)
+    masked_lion_image, mask = mask_the_lion_image(train_dotted_image, radious_list)
+
+
+    lion_images_list = get_detected_lions_list(masked_lion_image, dot_threshold=1, rectangle_shape=False)
+    
+    lion_count_sum = np.array([0,0,0,0,0])
+    for gg in range(len(lion_images_list)):
+        lion_count = count_lions_in_a_single_lion_image(lion_images_list[gg])
+        lion_count_sum = lion_count_sum + np.array(lion_count)
+        print("Lion count: " + str(lion_count))
+
+    print(lion_count_sum)
+    
 
 
 def manual_testing():
@@ -1357,7 +1433,7 @@ if __name__ == '__main__':
     #load_single_file("/home/tadek/Coding/Kaggle/SeaLionPopulation/temp/1_prep_data_c_1_i_4_j_5.npz")
     
     
-    collection_of_resized_image_patches_lists, collection_of_resized_mask_patches_lists = prepare_single_image(train_image_filename, 
+    collection_of_resized_image_patches_lists, collection_of_resized_mask_patches_lists = prepare_single_full_input_image(train_image_filename, 
                                                                                                                train_dotted_image_filename,
                                                                                                                patch_h=500,
                                                                                                                patch_w=500,
@@ -1365,11 +1441,25 @@ if __name__ == '__main__':
                                                                                                                resize_image_patch_to_w=192,
                                                                                                                resize_mask_patch_to_h=48,
                                                                                                                resize_mask_patch_to_w=48,
-                                                                                                               radious_list = [32, 32, 32, 16, 32],
+                                                                                                               radious_list = [24, 24, 24, 16, 24],
                                                                                                                sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)], 
                                                                                                                interactive_plot=False,
                                                                                                                display_every=87)
     
+
+    manual_test_of_lion_counting(train_image_filename, 
+                                 train_dotted_image_filename,
+                                 patch_h=500,
+                                 patch_w=500,
+                                 resize_image_patch_to_h=192,
+                                 resize_image_patch_to_w=192,
+                                 resize_mask_patch_to_h=48,
+                                 resize_mask_patch_to_w=48,
+                                 radious_list = [24, 24, 24, 16, 24],
+                                 sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)], 
+                                 interactive_plot=False,
+                                 display_every=87)
+
 
     #filename_list = [CONST_TRAIN_DOTTED_IMAGES_DIR + str(i) + ".jpg" for i in range(10 + 1)]
 
