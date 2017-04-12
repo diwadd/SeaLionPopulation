@@ -201,14 +201,14 @@ def draw_poly(image, contour, epsilon=0.01, color=CONST_GREEN_COLOR):
 
 
 def get_detected_lions_list(masked_lion_image, 
-                            dot_threshold=50, 
-                            h_threshold=10, 
-                            w_threshold=10,
+                            lions_contour_dot_threshold=1, 
+                            h_threshold=16, 
+                            w_threshold=16,
                             rectangle_shape=True):
 
     gray_image = cv2.cvtColor(masked_lion_image, cv2.COLOR_BGR2GRAY)
     
-    _, thresholded_image = cv2.threshold(gray_image, dot_threshold, 255, cv2.THRESH_BINARY)
+    _, thresholded_image = cv2.threshold(gray_image, lions_contour_dot_threshold, 255, cv2.THRESH_BINARY)
     _, contours, _ = cv2.findContours(thresholded_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
     #cv2.imwrite("base_image.jpg", masked_lion_image)
@@ -226,6 +226,7 @@ def get_detected_lions_list(masked_lion_image,
         if (rectangle_shape == True):
             lions_image = masked_lion_image[y:(y + h), x:(x + w)]
             lion_images_list.append(lions_image)
+            #cv2.imwrite("e0_extracted_lions_c_" + str(c) + ".jpg", lions_image)
             continue
 
         # This part of the code will find the minimal
@@ -237,12 +238,17 @@ def get_detected_lions_list(masked_lion_image,
         e_mask = np.zeros((eh, ew))
         cv2.ellipse(e_mask, ellipse, CONST_BLUE_COLOR, -1)
 
+        # Values in mask should be between 0.0 and 1.0
+        e_mask = e_mask/255.0
+
         e_masked_image = np.array(masked_lion_image)
         e_masked_image = apply_mask(e_masked_image, e_mask)
 
+        #e_gray_image = np.array(e_masked_image, dtype=np.uint8)
         e_gray_image = cv2.cvtColor(e_masked_image, cv2.COLOR_BGR2GRAY)
-        
-        _, e_thresholded_image = cv2.threshold(e_gray_image, dot_threshold, 255, cv2.THRESH_BINARY)
+        cv2.imwrite("z0_extracted_lions_c_" + str(c) + ".jpg", e_masked_image)
+
+        _, e_thresholded_image = cv2.threshold(e_gray_image, lions_contour_dot_threshold, 255, cv2.THRESH_BINARY)
         _, e_contours, _ = cv2.findContours(e_thresholded_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         for j in range(len(e_contours)):
@@ -255,7 +261,9 @@ def get_detected_lions_list(masked_lion_image,
                 continue
 
             # If the contour is big enough then we found the right one.
-            lions_image = masked_lion_image[y:(y + h), x:(x + w)]
+            lions_image = masked_lion_image[y:(y + h), x:(x + w), :]
+            lions_mask = e_thresholded_image[y:(y + h), x:(x + w)]     
+            lions_image = apply_mask(lions_image, lions_mask/255.0)
             lion_images_list.append(lions_image)
             break
 
@@ -269,7 +277,26 @@ def get_detected_lions_list(masked_lion_image,
     return lion_images_list
 
 
-def count_lions_in_a_single_lion_image(lion_image, radious=15, dot_threshold=1):
+def resize_lion_images_list(lion_images_list,
+                            nh=48,
+                            nw=48):
+
+    n_images = len(lion_images_list)
+    for i in range(n_images):
+        lion_images_list[i] = cv2.resize(lion_images_list[i], (nw, nh), interpolation = cv2.INTER_LINEAR)
+        #cv2.imwrite("r0_extracted_lions_i_" + str(i) + ".jpg", lion_images_list[i])
+
+    return lion_images_list
+
+
+def save_lion_images_list(lion_images_list, filename_stem):
+
+    n_images = len(lion_images_list)
+    for i in range(n_images):
+        cv2.imwrite(filename_stem + "_n_" + str(i) + ".jpg", lion_images_list[i])
+
+
+def count_lions_in_a_single_lion_image(lion_image, counting_radious=15, counting_dot_threshold=1):
     """
     Takes a sinle lion image and determins the number of
     lions in the image. 
@@ -296,12 +323,26 @@ def count_lions_in_a_single_lion_image(lion_image, radious=15, dot_threshold=1):
         
         gray_image = processing_image.astype(np.uint8) # cv2.cvtColor(processing_image.astype(np.uint8), cv2.COLOR_BGR2GRAY)
         
-        _, thresholded_image = cv2.threshold(gray_image, dot_threshold, 255, cv2.THRESH_BINARY)
+        _, thresholded_image = cv2.threshold(gray_image, counting_dot_threshold, 255, cv2.THRESH_BINARY)
         _, contours, _ = cv2.findContours(thresholded_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         lions_count[c] = lions_count[c] + len(contours)
 
     return lions_count
+
+
+def count_lions_in_a_lion_images_list(lion_images_list, counting_radious=15, counting_dot_threshold=1):
+    
+    n_images = len(lion_images_list)
+    lion_count_in_images_list = [np.array([0,0,0,0,0]) for i in range(n_images)]
+    lion_over_all_count = np.array([0,0,0,0,0])
+
+    for i in range(len(lion_images_list)):
+        lion_count = count_lions_in_a_single_lion_image(lion_images_list[i], counting_radious, counting_dot_threshold)
+        lion_count_in_images_list[i] = lion_count
+        lion_over_all_count = lion_over_all_count + np.array(lion_count)
+
+    return lion_count_in_images_list, lion_over_all_count 
 
 
 def mask_the_lion_image(image, radious_list=[45, 50, 40, 22, 42], dot_threshold=50):
@@ -1255,6 +1296,58 @@ def load_single_file(filename):
     print("msk_max: " + str(msk_max))
 
 
+def prepare_lions_extraction_single_full_image(train_image_filename,
+                                               train_dotted_image_filename,
+                                               radious_list=[32, 32, 32, 16, 32], 
+                                               counting_radious=15,
+                                               nh=48,
+                                               nw=48,
+                                               counting_dot_threshold=1,
+                                               lions_contour_dot_threshold=1, 
+                                               h_threshold=16, 
+                                               w_threshold=16,
+                                               rectangle_shape=True):
+
+    train_filename_stem = get_filename_stem(train_image_filename)
+    train_dotted_filename_stem = get_filename_stem(train_dotted_image_filename)
+
+    if (train_filename_stem != train_dotted_filename_stem):
+        sys.exit("ERROR! Filename stems do not agree.")
+
+    train_image = cv2.imread(train_image_filename)
+    train_dotted_image = cv2.imread(train_dotted_image_filename)
+
+    if (train_image.shape != train_dotted_image.shape):
+        sys.exit("ERROR! Train and train dotted image shapes do not agree.")
+
+    dotted_masked_lion_image, mask = mask_the_lion_image(train_dotted_image, radious_list=radious_list)
+    masked_lion_image = apply_mask(train_image, mask)
+
+
+    dotted_lion_images_list = get_detected_lions_list(dotted_masked_lion_image,
+                                                      lions_contour_dot_threshold=lions_contour_dot_threshold, 
+                                                      h_threshold=h_threshold, 
+                                                      w_threshold=w_threshold,
+                                                      rectangle_shape=rectangle_shape)
+
+
+    lion_images_list = get_detected_lions_list(masked_lion_image,
+                                               lions_contour_dot_threshold=lions_contour_dot_threshold, 
+                                               h_threshold=h_threshold, 
+                                               w_threshold=w_threshold,
+                                               rectangle_shape=rectangle_shape)
+
+    lion_images_list = resize_lion_images_list(lion_images_list, nh=nh, nw=nw)    
+    lion_count_in_images_list, lion_over_all_count = count_lions_in_a_lion_images_list(dotted_lion_images_list,
+                                                                                       counting_radious=counting_radious, 
+                                                                                       counting_dot_threshold=counting_dot_threshold)
+
+    print(lion_over_all_count)
+    
+    return lion_images_list, lion_count_in_images_list
+
+
+
 
 def manual_test_of_lion_counting(train_image_filename, 
                                  train_dotted_image_filename,
@@ -1267,21 +1360,22 @@ def manual_test_of_lion_counting(train_image_filename,
                                  radious_list = [32, 32, 32, 16, 32],
                                  sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)],
                                  interactive_plot=False,
-                                 display_every=10):
+                                 display_every=10,
+                                 rectangle_shape=True):
 
     train_dotted_image = cv2.imread(train_dotted_image_filename)
     masked_lion_image, mask = mask_the_lion_image(train_dotted_image, radious_list)
 
 
-    lion_images_list = get_detected_lions_list(masked_lion_image, dot_threshold=1, rectangle_shape=False)
-    
-    lion_count_sum = np.array([0,0,0,0,0])
-    for gg in range(len(lion_images_list)):
-        lion_count = count_lions_in_a_single_lion_image(lion_images_list[gg])
-        lion_count_sum = lion_count_sum + np.array(lion_count)
-        print("Lion count: " + str(lion_count))
+    lion_images_list = get_detected_lions_list(masked_lion_image, rectangle_shape=rectangle_shape)   
 
-    print(lion_count_sum)
+    lion_count_in_images_list, lion_over_all_count = count_lions_in_a_lion_images_list(lion_images_list)
+    lion_images_list = resize_lion_images_list(lion_images_list) 
+    #for i in range(len(lion_count_in_images_list)):
+
+    #    print("Lion count: " + str(lion_count_in_images_list[i]))
+
+    print(lion_over_all_count)
     
 
 
@@ -1445,8 +1539,7 @@ if __name__ == '__main__':
                                                                                                                sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)], 
                                                                                                                interactive_plot=False,
                                                                                                                display_every=87)
-    
-
+    """
     manual_test_of_lion_counting(train_image_filename, 
                                  train_dotted_image_filename,
                                  patch_h=500,
@@ -1455,31 +1548,28 @@ if __name__ == '__main__':
                                  resize_image_patch_to_w=192,
                                  resize_mask_patch_to_h=48,
                                  resize_mask_patch_to_w=48,
-                                 radious_list = [24, 24, 24, 16, 24],
+                                 radious_list = [24, 24, 24, 12, 24],
                                  sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)], 
                                  interactive_plot=False,
                                  display_every=87)
 
-
-    #filename_list = [CONST_TRAIN_DOTTED_IMAGES_DIR + str(i) + ".jpg" for i in range(10 + 1)]
-
-    #dispatch_preprocessed_data(filename_list)
-
-    #manual_testing()
-
-    #filename_list = [CONST_TRAIN_DOTTED_IMAGES_DIR + str(i) + ".jpg" for i in range(10 + 1)]
-
-    #ew, ev = get_data_eigenvalues_and_eigenvectors(filename_list, fraction=1)
-    #ca_std=0.5
-
-    #image = cv2.imread(filename_list[8])
-
-    #patch_h = 500
-    #patch_w = 500
-    #image_patches_list = slice_the_image_into_patches(image, patch_h, patch_w)
+    """
 
 
+    lion_images_list, lion_count_in_images_list = prepare_lions_extraction_single_full_image(train_image_filename,
+                                                                                             train_dotted_image_filename,
+                                                                                             radious_list = [24, 24, 24, 12, 24], 
+                                                                                             counting_radious=15,
+                                                                                             nh=48,
+                                                                                             nw=48,
+                                                                                             counting_dot_threshold=1,
+                                                                                             lions_contour_dot_threshold=1,
+                                                                                             h_threshold=16, 
+                                                                                             w_threshold=16,
+                                                                                             rectangle_shape=True)
 
+
+    #save_lion_images_list(lion_images_list, "some_file")
 
 
 
