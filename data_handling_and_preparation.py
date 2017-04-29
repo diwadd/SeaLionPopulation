@@ -7,6 +7,7 @@ import glob
 import time
 import shutil
 import re
+import csv
 
 import cv2
 import numpy as np
@@ -21,30 +22,26 @@ import matplotlib.image as mpimg
 # green: pups
 
 CONST_COLOR_LIST = ["RED", "MAGENTA", "BROWN", "BLUE", "GREEN"]
-CONST_TRAIN_DOTTED_IMAGES_DIR = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall/TrainDotted/"
-CONST_TRAIN_IMAGES_DIR = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall/Train/"
-CONST_PREPROCESSED_DATA_DIR = "/home/tadek/Coding/Kaggle/SeaLionPopulation/PreProcessedTrainData/"
 CONST_WHITE_COLOR = (255, 255, 255)
 CONST_BLUE_COLOR = (255, 0, 0)
 CONST_GREEN_COLOR = (0, 255, 0)
 CONST_RED_COLOR = (0, 0, 255)
 
+# RBG in OpenCV is BGR = [BLUE, GREEN, RED]
+MAGENTA_RGB_LOWER_BOUND = np.array([225,  0, 225], dtype=np.uint8)
+MAGENTA_RGB_UPPER_BOUND = np.array([255, 30, 255], dtype=np.uint8)
 
-def measure_time(func):
-    """
-    Decorator to measure the execution time of a function.
-    """
-    def func_wrapper(*args, **kwargs):
+RED_RGB_LOWER_BOUND = np.array([ 0,  0, 225], dtype=np.uint8)
+RED_RGB_UPPER_BOUND = np.array([30, 30, 255], dtype=np.uint8)
 
-        start = time.time()
-        ret = func(*args, **kwargs)
-        stop = time.time()
-        print("Time spent in function " + func.__name__ + ": " + str(stop - start))
-        
-        return ret
+BLUE_RGB_LOWER_BOUND = np.array([140, 40, 15], dtype=np.uint8)
+BLUE_RGB_UPPER_BOUND = np.array([255, 80, 55], dtype=np.uint8)
 
-    return func_wrapper
+GREEN_RGB_LOWER_BOUND = np.array([5, 145, 20], dtype=np.uint8)
+GREEN_RGB_UPPER_BOUND = np.array([55, 195, 70], dtype=np.uint8)
 
+BROWN_RGB_LOWER_BOUND = np.array([ 0, 37,  70], dtype=np.uint8)
+BROWN_RGB_UPPER_BOUND = np.array([15, 55,  95], dtype=np.uint8)
 
 
 class SAP:
@@ -70,6 +67,41 @@ class SAP:
         return "rotation angle: %f deg, scale: %f" % (ra, s)
 
 
+def read_csv(filename):
+    
+    with open(filename) as f:
+        reader = csv.reader(f)
+        l = list(reader)
+
+    return l[1:]
+
+
+def get_sinlge_image_expected_lion_count_list(image_id, expected_lion_count_list):
+
+    # single image lion count list
+    silcl = expected_lion_count_list[image_id]
+
+    silcl = [int(silcl[i]) for i in range(1, len(silcl))]
+
+    return silcl
+
+
+def measure_time(func):
+    """
+    Decorator to measure the execution time of a function.
+    """
+    def func_wrapper(*args, **kwargs):
+
+        start = time.time()
+        ret = func(*args, **kwargs)
+        stop = time.time()
+        print("Time spent in function " + func.__name__ + ": " + str(stop - start))
+        
+        return ret
+
+    return func_wrapper
+
+
 def detect_dots_in_image(image, color="MAGENTA"):
     """
     This function takes an RBG image with sea lions.
@@ -85,29 +117,6 @@ def detect_dots_in_image(image, color="MAGENTA"):
     color - color of the dots you want to detect.
     """
 
-    # RBG in OpenCV is BGR = [BLUE, GREEN, RED]
-    # Postfixes are used only for testing purposses.
-    DOTTED_IMAGE_MAGENTA_POSTFIX = "_dots_mag_x.jpg"
-    MAGENTA_RGB_LOWER_BOUND = np.array([225,  0, 225], dtype=np.uint8)
-    MAGENTA_RGB_UPPER_BOUND = np.array([255, 30, 255], dtype=np.uint8)
-
-    DOTTED_IMAGE_RED_POSTFIX = "_dots_red_x.jpg"
-    RED_RGB_LOWER_BOUND = np.array([ 0,  0, 225], dtype=np.uint8)
-    RED_RGB_UPPER_BOUND = np.array([30, 30, 255], dtype=np.uint8)
-
-    DOTTED_IMAGE_BLUE_POSTFIX = "_dots_blu_x.jpg"
-    BLUE_RGB_LOWER_BOUND = np.array([140, 40, 15], dtype=np.uint8)
-    BLUE_RGB_UPPER_BOUND = np.array([255, 80, 55], dtype=np.uint8)
-
-    DOTTED_IMAGE_GREEN_POSTFIX = "_dots_gre_x.jpg"
-    GREEN_RGB_LOWER_BOUND = np.array([5, 145, 20], dtype=np.uint8)
-    GREEN_RGB_UPPER_BOUND = np.array([55, 195, 70], dtype=np.uint8)
-
-    DOTTED_IMAGE_BROWN_POSTFIX = "_dots_bro_x.jpg"
-    BROWN_RGB_LOWER_BOUND = np.array([ 0, 37,  70], dtype=np.uint8)
-    BROWN_RGB_UPPER_BOUND = np.array([15, 55,  95], dtype=np.uint8)
-
-
     h, w, c = image.shape
 
     mask = None
@@ -117,39 +126,32 @@ def detect_dots_in_image(image, color="MAGENTA"):
         mask = cv2.inRange(image,
                            MAGENTA_RGB_LOWER_BOUND,
                            MAGENTA_RGB_UPPER_BOUND)
-        image_post_fix = DOTTED_IMAGE_MAGENTA_POSTFIX
 
     elif color == "RED":
         mask = cv2.inRange(image,
                            RED_RGB_LOWER_BOUND,
                            RED_RGB_UPPER_BOUND)
-        image_post_fix = DOTTED_IMAGE_RED_POSTFIX
 
     elif color == "BLUE":
         mask = cv2.inRange(image,
                            BLUE_RGB_LOWER_BOUND,
                            BLUE_RGB_UPPER_BOUND)
-        image_post_fix = DOTTED_IMAGE_BLUE_POSTFIX
 
     elif color == "GREEN":
         mask = cv2.inRange(image,
                            GREEN_RGB_LOWER_BOUND,
                            GREEN_RGB_UPPER_BOUND)
-        image_post_fix = DOTTED_IMAGE_GREEN_POSTFIX
 
     elif color == "BROWN":
         mask = cv2.inRange(image,
                            BROWN_RGB_LOWER_BOUND,
                            BROWN_RGB_UPPER_BOUND)
-        image_post_fix = DOTTED_IMAGE_BROWN_POSTFIX
 
     else:
         pass
 
     dotted_image = np.zeros((h,w,c), dtype=np.uint8)
     cv2.bitwise_and(image, image, dotted_image, mask=mask)
-
-    #cv2.imwrite(image_filename.replace(".jpg", image_post_fix), dotted_image)
 
     return dotted_image
 
@@ -323,7 +325,7 @@ def count_lions_in_a_single_lion_image(lion_image, counting_radious=15, counting
     lions in the image. 
     In principle there should be only one lion on each image.
     This is however not always true since some times the lions
-    lie very close to one another.
+    lie very close to one another and when they are extracted.
     Returns an array with the corresponing counts.
 
     """
@@ -813,7 +815,7 @@ def color_augmentation_of_an_image(image, ew, ev, ca_std=0.2):
 
     image = image/255.0
 
-    h, w, c = image.shape    
+    h, w, c = image.shape   
     
     r = np.random.randn(c)
 
@@ -1160,17 +1162,7 @@ def display_images_and_masks_in_patches_list(image_patch,
 
     plt.suptitle(str(sap))
     plt.show()
-
-
-def check_image_validity(filename_stem):
-
-    invalid_images = ["530", "638"]
-    for inv in invalid_images:
-        if(filename_stem == inv):
-            return False
-
-    return True        
-
+      
 
 def prepare_single_full_input_image(train_image_filename, 
                                     train_dotted_image_filename,
@@ -1286,6 +1278,17 @@ def check_if_dir_exists_create_it_if_not(preprocessed_data_dir):
     else:
         os.makedirs(preprocessed_data_dir)
 
+
+def check_image_validity(filename_stem):
+
+    invalid_images = ["530", "638"]
+    for inv in invalid_images:
+        if(filename_stem == inv):
+            return False
+
+    return True  
+
+
 def prepare_and_dispatch_lion_detection_data(train_image_filename_list, 
                                              train_dotted_image_filename_list,
                                              preprocessed_data_dir,
@@ -1316,9 +1319,6 @@ def prepare_and_dispatch_lion_detection_data(train_image_filename_list,
         filename_stem = get_filename_stem(train_image_filename_list[i])
         is_valid = check_image_validity(filename_stem)        
         if (is_valid == False):
-            continue
-
-        if (i < n_files/2):
             continue
 
         print(train_image_filename_list[i])
@@ -1353,11 +1353,11 @@ def load_files_in_folder(folder_name):
     for f in filename_list:    
         loaded = np.load(f)
 
-def load_single_file(filename):
+def load_single_lion_detection_file(filename):
     
     file_exists = os.path.exists(filename)
     if (file_exists == False):
-        sys.exit("ERROR! The file you provided does not exist!")
+        sys.exit("ERROR! The file path you provided does not exist!")
 
     loaded_data = np.load(filename)
     
@@ -1373,9 +1373,30 @@ def load_single_file(filename):
     print("img_max: " + str(img_max))
     print("msk_max: " + str(msk_max))
 
+    return image, mask
+
+
+def load_single_lion_count_file(filename):
+
+    file_exists = os.path.exists(filename)
+    if (file_exists == False):
+        sys.exit("ERROR! The file path you provided does not exist!")
+
+    loaded_data = np.load(filename)
+
+    image = loaded_data["image"]
+    labels = loaded_data["labels"]
+
+    print("image.shape: " + str(image.shape))
+    img_max = np.max(image)
+    print("img_max: " + str(img_max))
+
+    return image, labels
+
 
 def prepare_lions_extraction_single_full_image(train_image_filename,
                                                train_dotted_image_filename,
+                                               train_csv_filename,
                                                radious_list=[32, 32, 32, 16, 32], 
                                                counting_radious=15,
                                                nh=48,
@@ -1399,9 +1420,21 @@ def prepare_lions_extraction_single_full_image(train_image_filename,
 
     """
 
-
     train_filename_stem = get_filename_stem(train_image_filename)
     train_dotted_filename_stem = get_filename_stem(train_dotted_image_filename)
+
+    # All the images in the dataset have number names.
+    # We need to get the expcted number of lions in an image.
+    # The image is identified by its name.
+    # Thus, train_filename_stem should be convertible to int.
+    try:
+        image_id = int(train_filename_stem)
+    except ValueError:
+        sys. exit("ERROR: train_filename_stem is not a number!")
+
+    expected_lion_count_list = read_csv(train_csv_filename)
+    silcl = get_sinlge_image_expected_lion_count_list(image_id, expected_lion_count_list)
+
 
     if (train_filename_stem != train_dotted_filename_stem):
         sys.exit("ERROR! Filename stems do not agree.")
@@ -1436,15 +1469,17 @@ def prepare_lions_extraction_single_full_image(train_image_filename,
 
 
 
-    print(lion_over_all_count)
-    
-    return lion_count_in_images_list, lion_images_list
+    print("Extracted number of lions: " + str(lion_over_all_count))
+    print("Expected  number of lions: " + str(silcl))    
+
+    return lion_count_in_images_list, lion_images_list, lion_over_all_count
 
 
 
 
 def prepare_and_dispatch_lion_counting_data(train_image_filename_list, 
                                             train_dotted_image_filename_list,
+                                            train_csv_filename,
                                             preprocessed_data_dir,
                                             radious_list=[32, 32, 32, 16, 32], 
                                             counting_radious=15,
@@ -1459,27 +1494,27 @@ def prepare_and_dispatch_lion_counting_data(train_image_filename_list,
     check_if_dir_exists_create_it_if_not(preprocessed_data_dir)
 
     n_images = len(train_image_filename_list)
-    #print("Processed: 0.0 %% files.", end="\r")
     for n in range(n_images):
         print(train_image_filename_list[n])
-        lc, li = prepare_lions_extraction_single_full_image(train_image_filename_list[n],
-                                                            train_dotted_image_filename_list[n],
-                                                            radious_list=radious_list, 
-                                                            counting_radious=counting_radious,
-                                                            nh=nh,
-                                                            nw=nw,
-                                                            counting_dot_threshold=counting_dot_threshold,
-                                                            lions_contour_dot_threshold=lions_contour_dot_threshold, 
-                                                            h_threshold=h_threshold, 
-                                                            w_threshold=w_threshold,
-                                                            rectangle_shape=rectangle_shape)
+        lc, li, loa = prepare_lions_extraction_single_full_image(train_image_filename_list[n],
+                                                                 train_dotted_image_filename_list[n],
+                                                                 train_csv_filename,
+                                                                 radious_list=radious_list, 
+                                                                 counting_radious=counting_radious,
+                                                                 nh=nh,
+                                                                 nw=nw,
+                                                                 counting_dot_threshold=counting_dot_threshold,
+                                                                 lions_contour_dot_threshold=lions_contour_dot_threshold, 
+                                                                 h_threshold=h_threshold, 
+                                                                 w_threshold=w_threshold,
+                                                                 rectangle_shape=rectangle_shape)
 
         
         filename_stem = get_filename_stem(train_image_filename_list[n])
         filename_stem = preprocessed_data_dir + filename_stem + "_prep_data"
 
         savez_lion_images_and_count_in_images_lists(filename_stem, lc, li)
-        print("Processed: %f %% files." % ( 100.0*((n + 1)/n_files) ))
+        print("Processed: %f %% files." % ( 100.0*((n + 1)/n_images) ))
     print()
 
 
@@ -1509,7 +1544,8 @@ def manual_test_of_lion_counting(train_image_filename,
 
     #    print("Lion count: " + str(lion_count_in_images_list[i]))
 
-    print(lion_over_all_count)
+    #print("lion_over_all_count")
+    #print(lion_over_all_count)
     
 
 
@@ -1634,8 +1670,19 @@ def manual_testing():
 
 if __name__ == '__main__':
 
-    train_images_dir = "/media/tadek/My Passport/Kaggle.com/SeaLionPopulation/Kaggle-NOAA-SeaLions_FILES/Train/"
-    train_dotted_images_dir = "/media/tadek/My Passport/Kaggle.com/SeaLionPopulation/Kaggle-NOAA-SeaLions_FILES/TrainDotted/"
+    train_images_dir = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall2/Train/"
+    train_dotted_images_dir = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall2/TrainDotted/"
+    preprocessed_detection_data_dir = "/home/tadek/Coding/Kaggle/SeaLionPopulation/Detection_data/"
+    preprocessed_counting_data_dir = "/home/tadek/Coding/Kaggle/SeaLionPopulation/Counting_data/"
+    train_csv_filename = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall2/Train/train.csv"
+    detection_parameters_filename = "/home/tadek/Coding/Kaggle/SeaLionPopulation/parameters_file.pkls"
+
+    expected_lion_count_list = read_csv(train_csv_filename)
+    print(expected_lion_count_list[41])
+
+    silcl = get_sinlge_image_expected_lion_count_list(41, expected_lion_count_list)
+    print(silcl)
+
 
     train_image_filename_list = get_filename_list_in_dir(train_images_dir, file_type="jpg")
     train_dotted_image_filename_list = get_filename_list_in_dir(train_dotted_images_dir, file_type="jpg")
@@ -1655,92 +1702,78 @@ if __name__ == '__main__':
     print(filename_stem_train)
     print(filename_stem_train_dotted)
 
-    radious_list = [24, 24, 24, 12, 24]
+    parameter_file = open(detection_parameters_filename, "wb")
+
+    # Detection data parameters for dispatch.
+    patch_h=500
+    patch_w=500
+    resize_image_patch_to_h=128
+    resize_image_patch_to_w=128
+    resize_mask_patch_to_h=32
+    resize_mask_patch_to_w=32
+    radious_list=[20, 20, 20, 12, 20]
+    sap_list=[SAP(0.0, 1.0)]
+    interactive_plot=False
+    display_every=1
+
+    pickle.dump(patch_h, parameter_file)
+    pickle.dump(patch_w, parameter_file)
+    pickle.dump(resize_image_patch_to_h, parameter_file)
+    pickle.dump(resize_image_patch_to_w, parameter_file)
+    pickle.dump(resize_mask_patch_to_h, parameter_file)
+    pickle.dump(resize_mask_patch_to_w, parameter_file)
+    pickle.dump(radious_list, parameter_file)
+    pickle.dump(sap_list, parameter_file)
 
     print("Preparing sea lion detection training data.")
-    preprocessed_data_dir = "/home/tadek/Coding/Kaggle/SeaLionPopulation/temp/"
     prepare_and_dispatch_lion_detection_data(train_image_filename_list, 
-                              train_dotted_image_filename_list,
-                              preprocessed_data_dir,
-                              patch_h=500,
-                              patch_w=500,
-                              resize_image_patch_to_h=128,
-                              resize_image_patch_to_w=128,
-                              resize_mask_patch_to_h=32,
-                              resize_mask_patch_to_w=32,
-                              radious_list=radious_list,
-                              sap_list=[SAP(0.0, 1.0)],
-                              interactive_plot=False,
-                              display_every=10)
+                                             train_dotted_image_filename_list,
+                                             preprocessed_detection_data_dir,
+                                             patch_h=patch_h,
+                                             patch_w=patch_w,
+                                             resize_image_patch_to_h=resize_image_patch_to_h,
+                                             resize_image_patch_to_w=resize_image_patch_to_w,
+                                             resize_mask_patch_to_h=resize_mask_patch_to_h,
+                                             resize_mask_patch_to_w=resize_mask_patch_to_w,
+                                             radious_list=radious_list,
+                                             sap_list=sap_list,
+                                             interactive_plot=interactive_plot,
+                                             display_every=display_every)
+    # Counting data parameters for dispatch.
+    counting_radious=15
+    nh=32
+    nw=32
+    counting_dot_threshold=1
+    lions_contour_dot_threshold=1
+    h_threshold=16
+    w_threshold=16
+    rectangle_shape=True
+
+    pickle.dump(counting_radious, parameter_file)
+    pickle.dump(nh, parameter_file)
+    pickle.dump(nw, parameter_file)
+    pickle.dump(counting_dot_threshold, parameter_file)
+    pickle.dump(lions_contour_dot_threshold, parameter_file)
+    pickle.dump(h_threshold, parameter_file)
+    pickle.dump(w_threshold, parameter_file)
+    pickle.dump(rectangle_shape, parameter_file)
+    parameter_file.close()
 
     print("Preparing sea lion recognition and counting training data.")
-    preprocessed_data_dir = "/home/tadek/Coding/Kaggle/SeaLionPopulation/temp2/"
     prepare_and_dispatch_lion_counting_data(train_image_filename_list, 
                                             train_dotted_image_filename_list,
-                                            preprocessed_data_dir,
+                                            train_csv_filename,
+                                            preprocessed_counting_data_dir,
                                             radious_list=radious_list, 
-                                            counting_radious=15,
-                                            nh=32,
-                                            nw=32,
-                                            counting_dot_threshold=1,
-                                            lions_contour_dot_threshold=1, 
-                                            h_threshold=16, 
-                                            w_threshold=16,
-                                            rectangle_shape=True)
+                                            counting_radious=counting_radious,
+                                            nh=nh,
+                                            nw=nh,
+                                            counting_dot_threshold=counting_dot_threshold,
+                                            lions_contour_dot_threshold=lions_contour_dot_threshold, 
+                                            h_threshold=h_threshold, 
+                                            w_threshold=w_threshold,
+                                            rectangle_shape=rectangle_shape)
 
-    #load_single_file("/home/tadek/Coding/Kaggle/SeaLionPopulation/temp/1_prep_data_c_1_i_4_j_5.npz")
-    
-    """
-    output = prepare_single_full_input_image(train_image_filename, 
-                                              train_dotted_image_filename,
-                                              patch_h=500,
-                                              patch_w=500,
-                                              resize_image_patch_to_h=192,
-                                              resize_image_patch_to_w=192,
-                                              resize_mask_patch_to_h=48,
-                                              resize_mask_patch_to_w=48,
-                                              radious_list = [24, 24, 24, 16, 24],
-                                              sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)], 
-                                              interactive_plot=False,
-                                              display_every=87)
-
-    collection_of_resized_image_patches_lists = output[0]
-    collection_of_resized_mask_patches_lists = output[1]
-    """
-
-
-    """
-    manual_test_of_lion_counting(train_image_filename, 
-                                 train_dotted_image_filename,
-                                 patch_h=500,
-                                 patch_w=500,
-                                 resize_image_patch_to_h=192,
-                                 resize_image_patch_to_w=192,
-                                 resize_mask_patch_to_h=48,
-                                 resize_mask_patch_to_w=48,
-                                 radious_list = [24, 24, 24, 12, 24],
-                                 sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)], 
-                                 interactive_plot=False,
-                                 display_every=87)
-
-    """
-
-    """
-    lion_images_list, lion_count_in_images_list = prepare_lions_extraction_single_full_image(train_image_filename,
-                                                                                             train_dotted_image_filename,
-                                                                                             radious_list = [24, 24, 24, 12, 24], 
-                                                                                             counting_radious=15,
-                                                                                             nh=48,
-                                                                                             nw=48,
-                                                                                             counting_dot_threshold=1,
-                                                                                             lions_contour_dot_threshold=1,
-                                                                                             h_threshold=16, 
-                                                                                             w_threshold=16,
-                                                                                             rectangle_shape=True)
-
-    """
-
-    #save_lion_images_list(lion_images_list, "some_file")
 
 
 
