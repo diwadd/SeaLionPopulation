@@ -1318,6 +1318,9 @@ def prepare_and_dispatch_lion_detection_data(train_image_filename_list,
         if (is_valid == False):
             continue
 
+        if (i < n_files/2):
+            continue
+
         print(train_image_filename_list[i])
         #ci = collection_of_resized_image_patches_lists
         #cm = collection_of_resized_mask_patches_lists
