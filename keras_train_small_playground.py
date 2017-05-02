@@ -2,44 +2,13 @@ import os
 
 import numpy as np
 
-import keras
-from keras.models import Sequential
-from keras.layers import Dense, Dropout, Flatten
-from keras.layers import Conv2D, MaxPooling2D
+import keras_detection_model_definitions as kdmd
 
 import data_handling_and_preparation as dhap
 import working_directory_definition as wdd
 
 
-def TestNeuralNetworkModel(ih, iw, ic, mh, mw):
-    """
-    A simple model used to test the machinery.
-    ih, iw, ic - describe the dimensions of the input image
-    mh, mw - describe the dimensions of the output mask
 
-
-    """
-
-    model = Sequential()
-    model.add(Conv2D(32, kernel_size=(3, 3), activation="relu", input_shape=(ih, iw, ic)))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-    #model.add(Dropout(0.25))
-
-    model.add(Conv2D(64, (3, 3), activation="relu"))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-    #model.add(Dropout(0.25))
-
-    model.add(Flatten())
-    model.add(Dense(128, activation="relu"))
-    #model.add(Dropout(0.5))
-
-    model.add(Dense((mh * mw), activation="sigmoid"))
-
-    model.compile(loss='binary_crossentropy',
-                  optimizer='adadelta',
-                  metrics=['accuracy'])
-
-    return model
 
 
 
@@ -72,7 +41,7 @@ y_train = np.reshape(y_train, (nm_train, mh_train * mw_train))
 y_test = np.reshape(y_test, (nm_test, mh_test * mw_test))
 
 
-model = TestNeuralNetworkModel(ih, iw, ic, mh_train, mw_train)
+model = kdmd.TestNeuralNetworkModel(ih, iw, ic, mh_train, mw_train)
 
 model.fit(x_train, y_train,
           epochs=10,
