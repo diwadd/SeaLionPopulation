@@ -1568,7 +1568,7 @@ def load_single_lion_count_file(filename):
     return image, labels
 
 
-def load_lion_detection_files(filename_list):
+def load_lion_detection_files(filename_list, fraction=1.0):
 
     n_files = len(filename_list)
     if (n_files == 0):
@@ -1581,7 +1581,7 @@ def load_lion_detection_files(filename_list):
     x_data = image.reshape((1, ih, iw, ic))
     y_data = mask.reshape((1, mh, mw))
 
-    for n in range(1, n_files):
+    for n in range(1, int(fraction*n_files)):
         image, mask = load_single_lion_detection_file(filename_list[n])
 
         image = image.reshape((1, ih, iw, ic))
@@ -1593,7 +1593,10 @@ def load_lion_detection_files(filename_list):
     return x_data, y_data
 
 
-def load_train_test_data_trainsmall2(test_size=0.2, validation_size=0.5, random_state=1):
+def load_train_test_data_trainsmall2(test_size=0.2,
+                                     validation_size=0.5,
+                                     random_state=1, 
+                                     fraction=1.0):
     """
     Loads the prepossesed data for the TrainSmall2 dataset.
 
@@ -1611,7 +1614,7 @@ def load_train_test_data_trainsmall2(test_size=0.2, validation_size=0.5, random_
 
     filename_list = get_filename_list_in_dir(preprocessed_detection_data_dir, file_type="npz")
 
-    x_data, y_data = load_lion_detection_files(filename_list)
+    x_data, y_data = load_lion_detection_files(filename_list, fraction)
 
     print("Shape of x_data: %s" % (str(x_data.shape)))
     print("Shape of y_data: %s" % (str(y_data.shape)))
