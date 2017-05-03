@@ -1302,7 +1302,7 @@ def prepare_single_full_input_image(train_image_filename,
     return collection_of_resized_mask_patches_lists, collection_of_resized_image_patches_lists
 
 
-def check_if_dir_exists_create_it_if_not(preprocessed_data_dir):
+def check_if_dir_exists_create_it_if_not_remove_content(preprocessed_data_dir):
     """
     A helper function used mainly by:
     - prepare_and_dispatch_lion_detection_data
@@ -1318,6 +1318,25 @@ def check_if_dir_exists_create_it_if_not(preprocessed_data_dir):
         os.makedirs(preprocessed_data_dir)
     else:
         os.makedirs(preprocessed_data_dir)
+
+    return preprocessed_data_dir
+
+
+def check_if_dir_exists_create_it_if_not(directory):
+
+    pdd = os.path.isdir(directory)
+    if (pdd == False):
+        os.makedirs(directory)
+
+    return directory
+
+
+def check_if_directory_exists(directory):
+
+    if (os.path.isdir(directory) == False):
+        sys.exit("ERROR: " + directory + " does not exist!")
+
+    return directory
 
 
 def check_image_validity(filename_stem):
@@ -1357,7 +1376,7 @@ def prepare_and_dispatch_lion_detection_data(train_image_filename_list,
  
     """
 
-    check_if_dir_exists_create_it_if_not(preprocessed_data_dir)
+    check_if_dir_exists_create_it_if_not_remove_content(preprocessed_data_dir)
 
     n_files = len(train_image_filename_list)
     #print("Processed: 0.0 %% files.", end="\r")
@@ -1516,7 +1535,7 @@ def prepare_and_dispatch_lion_counting_data(train_image_filename_list,
                                             interactive_plot=False,
                                             display_every=10):
 
-    check_if_dir_exists_create_it_if_not(preprocessed_data_dir)
+    check_if_dir_exists_create_it_if_not_remove_content(preprocessed_data_dir)
 
     n_images = len(train_image_filename_list)
     for n in range(n_images):
@@ -1694,6 +1713,23 @@ def load_train_test_data_trainsmall2(test_size=0.2,
     return x_train, x_validation, x_test, y_train, y_validation, y_test
 
 
+def get_current_version_directory(top_dir):
+    """
+    The current version of the data parameters and models is
+    kept in the current_version file in the top directory.
+
+    This function reads this file and returns the
+    current version directory.
+
+    """
+
+    f = open(top_dir + "current_version", "r")
+    version_directory = f.readline()
+    f.close()
+
+    return version_directory
+
+
 if __name__ == '__main__':
 
     directories = wdd.check_directory_structure_trainsmall2()
@@ -1706,7 +1742,16 @@ if __name__ == '__main__':
     preprocessed_detection_data_dir = directories["PREPROCESSED_DETECTION_DATA_DIRECTORY"]
     preprocessed_counting_data_dir = directories["PREPROCESSED_COUNTING_DATA_DIRECTORY"]
     train_csv_filename = train_images_dir + "train.csv"
-    detection_parameters_filename = top_dir + "parameters_file.pkls"
+
+    # These are the parameters that will be used to generate the data.
+    # They are generated with one of the data_generation_parameters_ver_*.py scripts
+    # Generally the path should be top_dir + "Parameters_and_models_ver_x/parameters_file.pkls"
+    # where x is the version of the parameters used.
+    detection_parameters_filename = top_dir + "Parameters_and_models_ver_x/parameters_file.pkls"
+    
+    # Check if files exists
+    if (os.path.isfile(detection_parameters_filename) == False):
+        sys.exit("ERROR: The parameter files does not exists.")
 
     print("Directories that will be used:")
     print("top_dir: %s" % (top_dir))
@@ -1734,28 +1779,21 @@ if __name__ == '__main__':
     print()
 
     parameters = {}
-    parameter_file = open(detection_parameters_filename, "wb")
+    parameter_file = open(detection_parameters_filename, "rb")
+
+    parameters = pickle.load(parameter_file)
 
     # Detection data parameters for dispatch.
-    patch_h=500
-    patch_w=500
-    resize_image_patch_to_h=128
-    resize_image_patch_to_w=128
-    resize_mask_patch_to_h=32
-    resize_mask_patch_to_w=32
-    radious_list=[20, 20, 20, 12, 20]
-    sap_list=[SAP(0.0, 1.0)]
+    patch_h = parameters["patch_h"]
+    patch_w = parameters["patch_w"]
+    resize_image_patch_to_h = parameters["resize_image_patch_to_h"]
+    resize_image_patch_to_w = parameters["resize_image_patch_to_w"]
+    resize_mask_patch_to_h = parameters["resize_mask_patch_to_h"]
+    resize_mask_patch_to_w = parameters["resize_mask_patch_to_w"]
+    radious_list = parameters["radious_list"]
+    sap_list = parameters["sap_list"]
     interactive_plot=False
     display_every=10
-
-    parameters["patch_h"] = patch_h
-    parameters["patch_w"] = patch_w
-    parameters["resize_image_patch_to_h"] = resize_image_patch_to_h
-    parameters["resize_image_patch_to_w"] = resize_image_patch_to_w
-    parameters["resize_mask_patch_to_h"] = resize_mask_patch_to_h
-    parameters["resize_mask_patch_to_w"] = resize_mask_patch_to_w
-    parameters["radious_list"] = radious_list
-    parameters["sap_list"] = sap_list
 
     print("Preparing sea lion detection training data.")
     prepare_and_dispatch_lion_detection_data(train_image_filename_list, 
@@ -1773,29 +1811,19 @@ if __name__ == '__main__':
                                              display_every=display_every)
 
     # Counting data parameters for dispatch.
-    counting_radious=15
-    nh=32 # final image size - height
-    nw=32 # final image size - width
-    counting_dot_threshold=1
-    lions_contour_dot_threshold=1
-    h_threshold=16 # minimal height (size) of a single lion that will be cropped
-    w_threshold=16 # minimal width (size) of a single lion that will be cropped
-    rectangle_shape=True
+    counting_radious=parameters["counting_radious"]
+    nh=parameters["nh"] # final image size - height
+    nw=parameters["nw"] # final image size - width
+    counting_dot_threshold=parameters["counting_dot_threshold"]
+    lions_contour_dot_threshold=parameters["lions_contour_dot_threshold"]
+    h_threshold=parameters["h_threshold"] # minimal height (size) of a single lion that will be cropped
+    w_threshold=parameters["w_threshold"] # minimal width (size) of a single lion that will be cropped
+    rectangle_shape=parameters["rectangle_shape"]
 
     # Redefine for lion images
-    interactive_plot=True
+    interactive_plot=False
     display_every=1
 
-    parameters["counting_radious"] = counting_radious
-    parameters["nh"] = nh
-    parameters["nw"] = nw
-    parameters["counting_dot_threshold"] = counting_dot_threshold
-    parameters["lions_contour_dot_threshold"] = lions_contour_dot_threshold
-    parameters["h_threshold"] = h_threshold
-    parameters["w_threshold"] = w_threshold
-    parameters["rectangle_shape"] = rectangle_shape
-
-    pickle.dump(parameters, parameter_file)
     parameter_file.close()
 
     print("Preparing sea lion recognition and counting training data.")
