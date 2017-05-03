@@ -4,7 +4,7 @@ from keras.layers import Dense, Dropout, Flatten
 from keras.layers import Conv2D, MaxPooling2D
 
 
-def TestNeuralNetworkModel(ih, iw, ic, mh, mw):
+def TestDetectionNeuralNetworkModel(ih, iw, ic, mh, mw):
     """
     A simple model used to test the machinery.
     ih, iw, ic - describe the dimensions of the input image
@@ -28,8 +28,8 @@ def TestNeuralNetworkModel(ih, iw, ic, mh, mw):
 
     model.add(Dense((mh * mw), activation="sigmoid"))
 
-    model.compile(loss='binary_crossentropy',
-                  optimizer='adadelta',
-                  metrics=['accuracy'])
+    model.compile(loss="binary_crossentropy",
+                  optimizer="adadelta",
+                  metrics=["accuracy"])
 
     return model

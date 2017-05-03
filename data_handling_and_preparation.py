@@ -92,7 +92,7 @@ def get_sinlge_image_expected_lion_count_list(image_id, expected_lion_count_list
     # single image lion count list
     silcl = expected_lion_count_list[image_id]
 
-    silcl = [int(silcl[i]) for i in range(1, len(silcl))]
+    silcl = np.array([int(silcl[i]) for i in range(1, len(silcl))])
 
     return silcl
 
@@ -331,13 +331,13 @@ def resize_lion_images_list(lion_images_list,
     return lion_images_list
 
 
-def count_lions_in_a_single_lion_image(lion_image, counting_radious=15, counting_dot_threshold=1):
+def count_lions_in_a_single_lion_image(lion_image, counting_radious=10, counting_dot_threshold=1):
     """
     Takes a sinle lion image and determins the number of
     lions in the image. 
     In principle there should be only one lion on each image.
     This is however not always true since some times the lions
-    lie very close to one another and when they are extracted.
+    lie very close to one another when they are extracted.
     Returns an array with the corresponing counts.
 
     """
@@ -354,7 +354,7 @@ def count_lions_in_a_single_lion_image(lion_image, counting_radious=15, counting
         # We plot circles around them to make them into one solid block
         # of pixels. This can be done by the plot_circles_return_mask function.
         # We multiply by 255 because we want an image not a mask.
-        processing_image = 255.0*plot_circles_return_mask(processing_image, radious=10)
+        processing_image = 255.0*plot_circles_return_mask(processing_image, radious=counting_radious)
         
         gray_image = processing_image.astype(np.uint8) # cv2.cvtColor(processing_image.astype(np.uint8), cv2.COLOR_BGR2GRAY)
         
@@ -1042,9 +1042,15 @@ def savez_lion_images_and_count_in_images_lists(filename_stem,
 
     for n in range(n_images):
         fn = filename_stem + "_lion_images_list_n_" + str(n) + ".npz"
+
+        # Reshape the labels so they have a dimension (5, 1).
+        # where 5 is the number of sea lion types.
+        lc = lion_count_in_images_list[n]
+        lc = np.reshape(lc, (-1, 1))
+
         np.savez(fn,
                  image=(lion_images_list[n]/255.0).astype(np.float32),
-                 labels=lion_count_in_images_list[n])
+                 labels=lc)
 
 
 def save_images_in_patches_list(patches_list, image_filename):
@@ -1387,6 +1393,20 @@ def prepare_and_dispatch_lion_detection_data(train_image_filename_list,
     print()
 
 
+def show_lion_image_list(lion_images_list, display_every):
+    """
+    A helper function used in prepare_lions_extraction_single_full_image
+    to display the rectracted lion images.
+
+    """
+
+    n = len(lion_images_list)
+    for i in range(0, n, display_every):
+        plt.imshow(cv2.cvtColor(lion_images_list[i], cv2.COLOR_BGR2RGB))
+        plt.axis("off")
+        plt.show()  
+
+
 
 def prepare_lions_extraction_single_full_image(train_image_filename,
                                                train_dotted_image_filename,
@@ -1399,7 +1419,9 @@ def prepare_lions_extraction_single_full_image(train_image_filename,
                                                lions_contour_dot_threshold=1, 
                                                h_threshold=16, 
                                                w_threshold=16,
-                                               rectangle_shape=True):
+                                               rectangle_shape=True,
+                                               interactive_plot=False,
+                                               display_every=10):
     """
     Takes a train_dotted_image_filename file, read the image, calculates the mask.
     The mask is then applied to the file read from train_image_filename.
@@ -1411,6 +1433,9 @@ def prepare_lions_extraction_single_full_image(train_image_filename,
     A list (lion_count_in_images_list) of such arrays is returned.
     
     The number of lions in image lion_images_list[i] is given by lion_count_in_images_list[i].  
+
+    nh - output image height
+    nw - output image width
 
     """
 
@@ -1465,6 +1490,10 @@ def prepare_lions_extraction_single_full_image(train_image_filename,
 
     print("Extracted number of lions: " + str(lion_over_all_count))
     print("Expected  number of lions: " + str(silcl))    
+   
+
+    if (interactive_plot == True):   
+        show_lion_image_list(lion_images_list, display_every)
 
     return lion_count_in_images_list, lion_images_list, lion_over_all_count
 
@@ -1483,7 +1512,9 @@ def prepare_and_dispatch_lion_counting_data(train_image_filename_list,
                                             lions_contour_dot_threshold=1, 
                                             h_threshold=16, 
                                             w_threshold=16,
-                                            rectangle_shape=True):
+                                            rectangle_shape=True,
+                                            interactive_plot=False,
+                                            display_every=10):
 
     check_if_dir_exists_create_it_if_not(preprocessed_data_dir)
 
@@ -1501,7 +1532,9 @@ def prepare_and_dispatch_lion_counting_data(train_image_filename_list,
                                                                  lions_contour_dot_threshold=lions_contour_dot_threshold, 
                                                                  h_threshold=h_threshold, 
                                                                  w_threshold=w_threshold,
-                                                                 rectangle_shape=rectangle_shape)
+                                                                 rectangle_shape=rectangle_shape,
+                                                                 interactive_plot=interactive_plot,
+                                                                 display_every=display_every)
 
         
         filename_stem = get_filename_stem(train_image_filename_list[n])
@@ -1549,25 +1582,6 @@ def load_single_lion_detection_file(filename):
     return image, mask
 
 
-def load_single_lion_count_file(filename):
-    """
-    Load a single files that has been dispatched by
-    prepare_and_dispatch_lion_counting_data.
-
-    """
-
-    file_exists = os.path.exists(filename)
-    if (file_exists == False):
-        sys.exit("ERROR! The file path you provided does not exist!")
-
-    loaded_data = np.load(filename)
-
-    image = loaded_data["image"]
-    labels = loaded_data["labels"]
-
-    return image, labels
-
-
 def load_lion_detection_files(filename_list, fraction=1.0):
 
     n_files = len(filename_list)
@@ -1593,9 +1607,54 @@ def load_lion_detection_files(filename_list, fraction=1.0):
     return x_data, y_data
 
 
+def load_single_lion_count_file(filename):
+    """
+    Load a single files that has been dispatched by
+    prepare_and_dispatch_lion_counting_data.
+
+    """
+
+    file_exists = os.path.exists(filename)
+    if (file_exists == False):
+        sys.exit("ERROR! The file path you provided does not exist!")
+
+    loaded_data = np.load(filename)
+
+    image = loaded_data["image"]
+    labels = loaded_data["labels"]
+
+    return image, labels
+
+
+def load_lion_counting_files(filename_list, fraction=1.0):
+
+    n_files = len(filename_list)
+    if (n_files == 0):
+        sys.exit("ERROR: filename_list is empty.")
+
+    image, labels = load_single_lion_count_file(filename_list[0])
+    ih, iw, ic = image.shape
+    mh, _ = labels.shape
+
+    x_data = image.reshape((1, ih, iw, ic))
+    y_data = labels.reshape((1, mh))
+
+    for n in range(1, int(fraction*n_files)):
+        image, labels = load_single_lion_count_file(filename_list[n])
+
+        image = image.reshape((1, ih, iw, ic))
+        labels = labels.reshape((1, mh))
+
+        x_data = np.concatenate((x_data, image))
+        y_data = np.concatenate((y_data, labels))
+
+    return x_data, y_data
+
+
 def load_train_test_data_trainsmall2(test_size=0.2,
                                      validation_size=0.5,
-                                     random_state=1, 
+                                     random_state=1,
+                                     data_type="detection",
                                      fraction=1.0):
     """
     Loads the prepossesed data for the TrainSmall2 dataset.
@@ -1610,11 +1669,18 @@ def load_train_test_data_trainsmall2(test_size=0.2,
 
     print("Loading train and test data for the TrainSmall2 dataset...")
     directories = wdd.check_directory_structure_trainsmall2()
-    preprocessed_detection_data_dir = directories["PREPROCESSED_DETECTION_DATA_DIRECTORY"]
 
-    filename_list = get_filename_list_in_dir(preprocessed_detection_data_dir, file_type="npz")
+    if (data_type == "detection"):
+        preprocessed_data_dir = directories["PREPROCESSED_DETECTION_DATA_DIRECTORY"]
+    else:
+        preprocessed_data_dir = directories["PREPROCESSED_COUNTING_DATA_DIRECTORY"]
 
-    x_data, y_data = load_lion_detection_files(filename_list, fraction)
+    filename_list = get_filename_list_in_dir(preprocessed_data_dir, file_type="npz")
+
+    if (data_type == "detection"):
+        x_data, y_data = load_lion_detection_files(filename_list, fraction)
+    else:
+        x_data, y_data = load_lion_counting_files(filename_list, fraction)
 
     print("Shape of x_data: %s" % (str(x_data.shape)))
     print("Shape of y_data: %s" % (str(y_data.shape)))
@@ -1680,7 +1746,7 @@ if __name__ == '__main__':
     radious_list=[20, 20, 20, 12, 20]
     sap_list=[SAP(0.0, 1.0)]
     interactive_plot=False
-    display_every=1
+    display_every=10
 
     parameters["patch_h"] = patch_h
     parameters["patch_w"] = patch_w
@@ -1708,13 +1774,17 @@ if __name__ == '__main__':
 
     # Counting data parameters for dispatch.
     counting_radious=15
-    nh=32
-    nw=32
+    nh=32 # final image size - height
+    nw=32 # final image size - width
     counting_dot_threshold=1
     lions_contour_dot_threshold=1
-    h_threshold=16
-    w_threshold=16
+    h_threshold=16 # minimal height (size) of a single lion that will be cropped
+    w_threshold=16 # minimal width (size) of a single lion that will be cropped
     rectangle_shape=True
+
+    # Redefine for lion images
+    interactive_plot=True
+    display_every=1
 
     parameters["counting_radious"] = counting_radious
     parameters["nh"] = nh
@@ -1741,7 +1811,9 @@ if __name__ == '__main__':
                                             lions_contour_dot_threshold=lions_contour_dot_threshold, 
                                             h_threshold=h_threshold, 
                                             w_threshold=w_threshold,
-                                            rectangle_shape=rectangle_shape)
+                                            rectangle_shape=rectangle_shape,
+                                            interactive_plot=interactive_plot,
+                                            display_every=display_every)
 
 
 
