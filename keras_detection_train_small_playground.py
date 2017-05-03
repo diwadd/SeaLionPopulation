@@ -41,7 +41,7 @@ y_train = np.reshape(y_train, (nm_train, mh_train * mw_train))
 y_test = np.reshape(y_test, (nm_test, mh_test * mw_test))
 
 
-model = kdmd.TestNeuralNetworkModel(ih, iw, ic, mh_train, mw_train)
+model = kdmd.TestDetectionNeuralNetworkModel(ih, iw, ic, mh_train, mw_train)
 
 model.fit(x_train, y_train,
           epochs=10,
