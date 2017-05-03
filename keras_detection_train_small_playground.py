@@ -47,7 +47,7 @@ K.get_session()
 model = kdmd.TestDetectionNeuralNetworkModel(ih, iw, ic, mh_train, mw_train)
 
 model.fit(x_train, y_train,
-          epochs=10,
+          epochs=1,
           batch_size=10,
           shuffle=True,
           validation_data=(x_test, y_test))
