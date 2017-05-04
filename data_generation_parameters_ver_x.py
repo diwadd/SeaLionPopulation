@@ -1,28 +1,24 @@
 import pickle
+import sys
 
 from data_handling_and_preparation import SAP
 import data_handling_and_preparation as dhap
 import working_directory_definition as wdd
 
-# Data generation parameters.
-# Version x
 
-directories = wdd.check_directory_structure_trainsmall2()
-top_dir = directories["TOP_DIR"]
+data_dir = sys.argv[1]
+version = sys.argv[2]
 
-version = "x"
-detection_parameters_directory = dhap.check_if_dir_exists_create_it_if_not(top_dir + "Parameters_and_models_ver_" + version + "/")
-detection_parameters_filename = detection_parameters_directory + "parameters_file.pkls"
 
-f = open(top_dir + "current_version", "w")
-f.write(detection_parameters_directory)
-f.close()
+directories = wdd.save_current_version(data_dir, version)
+
+parameters_filename = directories["PARAMETERS_FILENAME"]
 
 parameters = {}
-parameter_file = open(detection_parameters_filename, "wb")
+parameter_file = open(parameters_filename, "wb")
 
 parameters["version"] = version
-parameters["version_directory"] = detection_parameters_directory
+parameters["version_directory"] = parameters_filename
 
 # Detection data parameters for dispatch.
 patch_h=500

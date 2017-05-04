@@ -8,7 +8,7 @@ import time
 import shutil
 import re
 import csv
-import glob
+import json
 
 import cv2
 import numpy as np
@@ -1670,7 +1670,8 @@ def load_lion_counting_files(filename_list, fraction=1.0):
     return x_data, y_data
 
 
-def load_train_test_data_trainsmall2(test_size=0.2,
+def load_train_test_data_trainsmall2(directories,
+                                     test_size=0.2,
                                      validation_size=0.5,
                                      random_state=1,
                                      data_type="detection",
@@ -1687,7 +1688,6 @@ def load_train_test_data_trainsmall2(test_size=0.2,
     """
 
     print("Loading train and test data for the TrainSmall2 dataset...")
-    directories = wdd.check_directory_structure_trainsmall2()
 
     if (data_type == "detection"):
         preprocessed_data_dir = directories["PREPROCESSED_DETECTION_DATA_DIRECTORY"]
@@ -1719,23 +1719,28 @@ def get_current_version_directory(top_dir):
     kept in the current_version file in the top directory.
 
     This function reads this file and returns the
-    current version directory.
+    current version directories.
 
     """
 
     f = open(top_dir + "current_version", "r")
-    version_directory = f.readline()
+    directories = json.load(f)
     f.close()
 
-    return version_directory
+    return directories
+
 
 
 if __name__ == '__main__':
 
-    directories = wdd.check_directory_structure_trainsmall2()
-    
-    top_dir = directories["TOP_DIR"]
-    trainsmall2_dir = directories["TRAINSMALL2_DATA_DIRECTORY"]
+    #directories = wdd.check_directory_structure_trainsmall2()
+
+
+    top_dir = os.path.dirname(os.path.abspath(__file__)) + "/"
+    directories = get_current_version_directory(top_dir)
+
+
+    data_directory = directories["DATA_DIRECTORY"]
     train_images_dir = directories["TRAIN_DATA_DIRECTORY"]
     train_dotted_images_dir = directories["TRAIN_DOTTED_DATA_DIRECTORY"]
 
@@ -1747,7 +1752,7 @@ if __name__ == '__main__':
     # They are generated with one of the data_generation_parameters_ver_*.py scripts
     # Generally the path should be top_dir + "Parameters_and_models_ver_x/parameters_file.pkls"
     # where x is the version of the parameters used.
-    detection_parameters_filename = top_dir + "Parameters_and_models_ver_x/parameters_file.pkls"
+    detection_parameters_filename = directories["PARAMETERS_FILENAME"]
     
     # Check if files exists
     if (os.path.isfile(detection_parameters_filename) == False):
@@ -1755,7 +1760,7 @@ if __name__ == '__main__':
 
     print("Directories that will be used:")
     print("top_dir: %s" % (top_dir))
-    print("trainsmall2_dir: %s" % (trainsmall2_dir))
+    print("data_directory: %s" % (data_directory))
     print("train_images_dir: %s" % (train_images_dir))
     print("train_dotted_images_dir: %s" % (train_dotted_images_dir))
     print("preprocessed_detection_data_dir: %s" % (preprocessed_detection_data_dir))

@@ -15,6 +15,10 @@ version_directory = dhap.get_current_version_directory(top_dir)
 
 detection_model_filename = version_directory + "detection_model.h5"
 
+
+
+
+
 train_test_data = dhap.load_train_test_data_trainsmall2(fraction=0.2, data_type="detection")
 
 x_train = train_test_data[0]

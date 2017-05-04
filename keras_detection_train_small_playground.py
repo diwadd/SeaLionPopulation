@@ -9,13 +9,13 @@ import data_handling_and_preparation as dhap
 import working_directory_definition as wdd
 
 
-directories = wdd.check_directory_structure_trainsmall2()
-top_dir = directories["TOP_DIR"]
-version_directory = dhap.get_current_version_directory(top_dir)
 
-detection_model_filename = version_directory + "detection_model.h5"
+top_dir = os.path.dirname(os.path.abspath(__file__)) + "/"
+directories = dhap.get_current_version_directory(top_dir)
 
-train_test_data = dhap.load_train_test_data_trainsmall2(fraction=0.2, data_type="detection")
+detection_model_filename = directories["PARAMETERS_DIRECTORY"] + "detection_model.h5"
+train_test_data = dhap.load_train_test_data_trainsmall2(directories, fraction=0.2, data_type="detection")
+
 
 x_train = train_test_data[0]
 x_validation = train_test_data[1]
