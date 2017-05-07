@@ -14,7 +14,7 @@ top_dir = os.path.dirname(os.path.abspath(__file__)) + "/"
 directories = dhap.get_current_version_directory(top_dir)
 
 detection_model_filename = directories["PARAMETERS_DIRECTORY"] + "detection_model.h5"
-train_test_data = dhap.load_train_test_data_trainsmall2(directories, fraction=0.2, data_type="detection")
+train_test_data = dhap.load_train_test_data_trainsmall2(directories, fraction=1.0, data_type="detection")
 
 
 x_train = train_test_data[0]
@@ -44,11 +44,12 @@ y_train = np.reshape(y_train, (nm_train, mh_train * mw_train))
 y_test = np.reshape(y_test, (nm_test, mh_test * mw_test))
 
 K.get_session()
-model = kdmd.TestDetectionNeuralNetworkModel(ih, iw, ic, mh_train, mw_train)
+#model = kdmd.TestDetectionNeuralNetworkModel(ih, iw, ic, mh_train, mw_train)
+model = kdmd.DetectionNeuralNetworkModelTrainSmall2(ih, iw, ic, mh_train, mw_train)
 
 model.fit(x_train, y_train,
-          epochs=1,
-          batch_size=10,
+          epochs=500,
+          batch_size=100,
           shuffle=True,
           validation_data=(x_test, y_test))
 

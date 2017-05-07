@@ -1,4 +1,5 @@
 import pickle
+import os
 
 import cv2
 import numpy as np
@@ -68,8 +69,18 @@ def detect_sea_lions_in_image(filename,
     """
 
     train_image = cv2.imread(filename)
-
     image_patches_list = dhap.slice_the_image_into_patches(train_image, patch_h, patch_w)
+
+    # Recombine the image from the patches (train_image.shape != image.shape)
+    # bacause the size of the image is adjusted to be a multiple of patch_h and patch_w.    
+    image = dhap.combine_pathes_into_image(image_patches_list)
+
+    if (display_mask == True):
+        fig, ax = plt.subplots()
+        cax = ax.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        cbar = fig.colorbar(cax)
+        plt.axis("off")
+        plt.show()  
 
     # Resize the patches to the ones used by the model.
     image_patches_list = dhap.resize_patches_in_patches_list(image_patches_list, 
@@ -89,10 +100,24 @@ def detect_sea_lions_in_image(filename,
 
     mask = dhap.combine_pathes_into_mask(mask_patches_list)
 
+    image = dhap.apply_mask(image, mask)
+
     if (display_mask == True):
-        plt.imshow(mask)
+        fig, ax = plt.subplots()
+        cax = ax.imshow(mask)
+        cbar = fig.colorbar(cax)
         plt.axis("off")
         plt.show()  
+
+
+    if (display_mask == True):
+        fig, ax = plt.subplots()
+        cax = ax.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        cbar = fig.colorbar(cax)
+        plt.axis("off")
+        plt.show()  
+
+
 
     print(mask_patches_list[0][0].shape)
 
@@ -102,13 +127,14 @@ def detect_sea_lions_in_image(filename,
 
 if __name__ == '__main__':
 
-    directories = wdd.check_directory_structure_trainsmall2()
-    top_dir = directories["TOP_DIR"]
-    version_directory = dhap.get_current_version_directory(top_dir)
+    top_dir = os.path.dirname(os.path.abspath(__file__)) + "/"
+    directories = dhap.get_current_version_directory(top_dir)
+
+    parameters_directory = directories["PARAMETERS_DIRECTORY"]
 
     # To process the data we need the parameters with which the
-    # data were generated. This should be stored under version_directory + "parameters_file.pkls".
-    parameter_file = open(version_directory + "parameters_file.pkls", "rb")
+    # data were generated. This should be stored under parameters_directory + "parameters_file.pkls".
+    parameter_file = open(parameters_directory + "parameters_file.pkls", "rb")
     parameters = pickle.load(parameter_file)
 
 
@@ -133,8 +159,8 @@ if __name__ == '__main__':
     rectangle_shape=parameters["rectangle_shape"]
 
 
-    detection_model_hdf5_filename = version_directory + "detection_model.h5"
-    counting_model_hdf5_filename = version_directory + "counting_model.h5"
+    detection_model_hdf5_filename = parameters_directory + "detection_model.h5"
+    counting_model_hdf5_filename = parameters_directory + "counting_model.h5"
 
     K.get_session()
     detection_model = load_model(detection_model_hdf5_filename)
@@ -144,7 +170,8 @@ if __name__ == '__main__':
     print("detection model type: " + str(type(detection_model)))
     print("counting model type: " + str(type(counting_model)))
 
-    filename = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall/Train/1.jpg"
+    #filename = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall/Train/1.jpg"
+    filename = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall2/Train/48.jpg"
 
     detect_sea_lions_in_image(filename,
                               detection_model,

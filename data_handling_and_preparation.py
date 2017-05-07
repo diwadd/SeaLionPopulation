@@ -1011,6 +1011,14 @@ def savez_two_patches_list(filename_stem, mask_patches_list, image_patches_list)
             image_for_save = (image_patches_list[i][j]/255.0).astype(np.float32)
             mask_for_save = mask_patches_list[i][j].astype(np.float32)
 
+            mask_sum = np.sum(mask_for_save)
+
+            # If mask has no 1.0 entires then there are no lions in the image.
+            # We skip such an image (there should be at least one non zero pixel).
+            if (mask_sum < 1.0):
+                continue
+
+
             fn = filename_stem + "_patches_list_i_" + str(i) + "_j_" + str(j) + ".npz"
             np.savez_compressed(fn, 
                                 image=image_for_save.astype(np.float32), 
@@ -1339,7 +1347,7 @@ def check_if_directory_exists(directory):
     return directory
 
 
-def check_image_validity(filename_stem):
+def check_image_validity(filename_stem, invalid_images_list):
     """
     There are a number of bad images in the dataset.
     invalid_images_list lists the bad images.
@@ -1347,7 +1355,6 @@ def check_image_validity(filename_stem):
 
     """
 
-    invalid_images_list = ["530", "638"]
     for inv in invalid_images_list:
         if(filename_stem == inv):
             return False
@@ -1358,6 +1365,7 @@ def check_image_validity(filename_stem):
 def prepare_and_dispatch_lion_detection_data(train_image_filename_list, 
                                              train_dotted_image_filename_list,
                                              preprocessed_data_dir,
+                                             invalid_images_list,
                                              patch_h=500,
                                              patch_w=500,
                                              resize_image_patch_to_h=256,
@@ -1383,25 +1391,26 @@ def prepare_and_dispatch_lion_detection_data(train_image_filename_list,
     for i in range(n_files):
 
         filename_stem = get_filename_stem(train_image_filename_list[i])
-        is_valid = check_image_validity(filename_stem)        
+        is_valid = check_image_validity(filename_stem, invalid_images_list)        
         if (is_valid == False):
+            print("Image %s is invalid! Skipping!" % (filename_stem))
             continue
 
         print(train_image_filename_list[i])
         #ci = collection_of_resized_image_patches_lists
         #cm = collection_of_resized_mask_patches_lists
         cm, ci = prepare_single_full_input_image(train_image_filename_list[i], 
-                                      train_dotted_image_filename_list[i],
-                                      patch_h,
-                                      patch_w,
-                                      resize_image_patch_to_h,
-                                      resize_image_patch_to_w,
-                                      resize_mask_patch_to_h,
-                                      resize_mask_patch_to_w,
-                                      radious_list,
-                                      sap_list,
-                                      interactive_plot,
-                                      display_every)
+                                                 train_dotted_image_filename_list[i],
+                                                 patch_h,
+                                                 patch_w,
+                                                 resize_image_patch_to_h,
+                                                 resize_image_patch_to_w,
+                                                 resize_mask_patch_to_h,
+                                                 resize_mask_patch_to_w,
+                                                 radious_list,
+                                                 sap_list,
+                                                 interactive_plot,
+                                                 display_every)
 
 
         filename_stem = get_filename_stem(train_image_filename_list[i])
@@ -1523,6 +1532,7 @@ def prepare_and_dispatch_lion_counting_data(train_image_filename_list,
                                             train_dotted_image_filename_list,
                                             train_csv_filename,
                                             preprocessed_data_dir,
+                                            invalid_images_list,
                                             radious_list=[32, 32, 32, 16, 32], 
                                             counting_radious=15,
                                             nh=48,
@@ -1540,6 +1550,13 @@ def prepare_and_dispatch_lion_counting_data(train_image_filename_list,
     n_images = len(train_image_filename_list)
     for n in range(n_images):
         print(train_image_filename_list[n])
+
+        filename_stem = get_filename_stem(train_image_filename_list[i])
+        is_valid = check_image_validity(filename_stem, invalid_images_list)        
+        if (is_valid == False):
+            print("Image %s is invalid! Skipping!" % (filename_stem))
+            continue
+
         lc, li, loa = prepare_lions_extraction_single_full_image(train_image_filename_list[n],
                                                                  train_dotted_image_filename_list[n],
                                                                  train_csv_filename,
@@ -1601,6 +1618,7 @@ def load_single_lion_detection_file(filename):
     return image, mask
 
 
+@measure_time
 def load_lion_detection_files(filename_list, fraction=1.0):
 
     n_files = len(filename_list)
@@ -1611,17 +1629,23 @@ def load_lion_detection_files(filename_list, fraction=1.0):
     ih, iw, ic = image.shape
     mh, mw = mask.shape
 
-    x_data = image.reshape((1, ih, iw, ic))
-    y_data = mask.reshape((1, mh, mw))
+    x_data = np.zeros((n_files, ih, iw, ic))
+    y_data = np.zeros((n_files, mh, mw))
+
+    x_data[0, :, :, :] = image
+    y_data[0, :, :] = mask
 
     for n in range(1, int(fraction*n_files)):
         image, mask = load_single_lion_detection_file(filename_list[n])
 
-        image = image.reshape((1, ih, iw, ic))
-        mask = mask.reshape((1, mh, mw))
+        #image = image.reshape((1, ih, iw, ic))
+        #mask = mask.reshape((1, mh, mw))
 
-        x_data = np.concatenate((x_data, image))
-        y_data = np.concatenate((y_data, mask))
+        #x_data = np.concatenate((x_data, image))
+        #y_data = np.concatenate((y_data, mask))
+
+        x_data[n, :, :, :] = image
+        y_data[n, :, :] = mask
 
     return x_data, y_data
 
@@ -1730,6 +1754,32 @@ def get_current_version_directory(top_dir):
     return directories
 
 
+def filename_list_train_test_split(filename_list,
+                                   test_size=0.2,
+                                   validation_size=0.5,
+                                   random_state=1):
+    """
+    For data that do not fit into the memory this function takes
+    a list of filenames and splits the filesnames into three lists.
+
+    Files that will be used for:
+    1. training,
+    2. validation,
+    3. testing.
+
+    """
+
+    random.shuffle(filename_list)
+    dummpy_y = [0 for i in range(len(filename_list))]
+
+    x_train, x_test, y_train, y_test = train_test_split(filename_list, dummpy_y, test_size=test_size, random_state=random_state)
+
+    # A chunk of the test set will play the role of a validation set.
+    x_validation, x_test, y_validation, y_test = train_test_split(x_test, y_test, test_size=validation_size, random_state=random_state)
+
+    return x_train, x_validation, x_test, y_train, y_validation, y_test
+
+
 
 if __name__ == '__main__':
 
@@ -1747,6 +1797,10 @@ if __name__ == '__main__':
     preprocessed_detection_data_dir = directories["PREPROCESSED_DETECTION_DATA_DIRECTORY"]
     preprocessed_counting_data_dir = directories["PREPROCESSED_COUNTING_DATA_DIRECTORY"]
     train_csv_filename = train_images_dir + "train.csv"
+    mismatched_train_images_filename = top_dir + "MismatchedTrainImages.txt"
+
+    invalid_images_list = read_csv(mismatched_train_images_filename)
+    invalid_images_list = [invalid_images_list[i][0] for i in range(len(invalid_images_list))]
 
     # These are the parameters that will be used to generate the data.
     # They are generated with one of the data_generation_parameters_ver_*.py scripts
@@ -1804,6 +1858,7 @@ if __name__ == '__main__':
     prepare_and_dispatch_lion_detection_data(train_image_filename_list, 
                                              train_dotted_image_filename_list,
                                              preprocessed_detection_data_dir,
+                                             invalid_images_list,
                                              patch_h=patch_h,
                                              patch_w=patch_w,
                                              resize_image_patch_to_h=resize_image_patch_to_h,
@@ -1836,6 +1891,7 @@ if __name__ == '__main__':
                                             train_dotted_image_filename_list,
                                             train_csv_filename,
                                             preprocessed_counting_data_dir,
+                                            invalid_images_list,
                                             radious_list=radious_list, 
                                             counting_radious=counting_radious,
                                             nh=nh,

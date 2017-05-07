@@ -18,17 +18,16 @@ parameters = {}
 parameter_file = open(parameters_filename, "wb")
 
 parameters["version"] = version
-parameters["version_directory"] = parameters_filename
 
 # Detection data parameters for dispatch.
 patch_h=500
 patch_w=500
-resize_image_patch_to_h=128
-resize_image_patch_to_w=128
+resize_image_patch_to_h=256
+resize_image_patch_to_w=256
 resize_mask_patch_to_h=32
 resize_mask_patch_to_w=32
-radious_list=[20, 20, 20, 12, 20]
-sap_list=[SAP(0.0, 1.0)]
+radious_list=[24, 24, 24, 14, 24]
+sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0), SAP(180.0, 1.0), SAP(270.0, 1.0), SAP(0.0, 0.9), SAP(90.0, 0.9), SAP(180.0, 0.9), SAP(270.0, 0.9)]
 interactive_plot=False
 display_every=10
 
@@ -43,8 +42,8 @@ parameters["sap_list"] = sap_list
 
 # Counting data parameters for dispatch.
 counting_radious=15
-nh=32 # final image size - height
-nw=32 # final image size - width
+nh=128 # final image size - height
+nw=128 # final image size - width
 counting_dot_threshold=1
 lions_contour_dot_threshold=1
 h_threshold=16 # minimal height (size) of a single lion that will be cropped
