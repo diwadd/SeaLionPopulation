@@ -5,7 +5,7 @@ import data_handling_and_preparation as dhap
 
 
 
-def check_directory_structure_trainsmall2(data_dir):
+def check_directory_structure_trainsmall2(data_dir, preprocessed_top_dir):
 
     print("Checking directory structure...")
 
@@ -17,16 +17,16 @@ def check_directory_structure_trainsmall2(data_dir):
     directories["TRAIN_DATA_DIRECTORY"] = dhap.check_if_directory_exists(data_dir + "Train/")
     directories["TRAIN_DOTTED_DATA_DIRECTORY"] = dhap.check_if_directory_exists(data_dir + "TrainDotted/")
 
-    directories["PREPROCESSED_DETECTION_DATA_DIRECTORY"] = dhap.check_if_dir_exists_create_it_if_not(data_dir + "Detection_data/")
-    directories["PREPROCESSED_COUNTING_DATA_DIRECTORY"] = dhap.check_if_dir_exists_create_it_if_not(data_dir + "Counting_data/")
+    directories["PREPROCESSED_DETECTION_DATA_DIRECTORY"] = dhap.check_if_dir_exists_create_it_if_not(preprocessed_top_dir + "Detection_data/")
+    directories["PREPROCESSED_COUNTING_DATA_DIRECTORY"] = dhap.check_if_dir_exists_create_it_if_not(preprocessed_top_dir + "Counting_data/")
 
     print("Directory structure is OK!")
     return directories
 
 
-def save_current_version(data_dir, version):
+def save_current_version(data_dir, preprocessed_top_dir, version):
 
-    directories = check_directory_structure_trainsmall2(data_dir)
+    directories = check_directory_structure_trainsmall2(data_dir, preprocessed_top_dir)
     top_dir = directories["TOP_DIR"]
     parameters_directory = dhap.check_if_dir_exists_create_it_if_not(top_dir + "Parameters_and_models_ver_" + version + "/")
     parameters_filename = parameters_directory + "parameters_file.pkls"

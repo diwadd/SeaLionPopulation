@@ -366,6 +366,104 @@ def count_lions_in_a_single_lion_image(lion_image, counting_radious=10, counting
     return lions_count
 
 
+def softmax_dispatch_count_lions_in_a_single_lion_image(train_image, 
+                                                        train_dotted_image,
+                                                        radious_list=[48, 48, 48, 32, 48],
+                                                        dot_radious=3,
+                                                        counting_dot_threshold=1,
+                                                        h_threshold=5,
+                                                        w_threshold=5,
+                                                        take_train_dotted=False):
+    """
+    NBI
+    """
+
+    th, tw, tc = train_dotted_image.shape
+
+    color_list = CONST_COLOR_LIST
+    lions_count = [0, 0, 0, 0, 0]
+    sea_lion_images = []
+    earth_image = []
+
+
+    for c in range(len(color_list)):
+
+        processing_image = np.array(train_dotted_image)
+        processing_image = detect_dots_in_image(processing_image, color=color_list[c])
+
+        # The dots that are detected can be fragmented.
+        # We plot circles around them to make them into one solid block
+        # of pixels. This can be done by the plot_circles_return_mask function.
+        # We multiply by 255 because we want an image not a mask.
+        processing_image = 255.0*plot_circles_return_mask(processing_image, radious=dot_radious)
+
+        gray_image = processing_image.astype(np.uint8)
+
+        _, thresholded_image = cv2.threshold(gray_image, counting_dot_threshold, 255, cv2.THRESH_BINARY)
+        _, contours, _ = cv2.findContours(thresholded_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Extract the lion around every dot.
+        # This is a dot by dot extraction.
+        # The circle is drawn around one dot at a time.
+        # In count_lions_in_a_single_lion_image we use plot_circles_return_mask
+        # which plots a circle around all dots.
+        for i in range(len(contours)):
+            x = contours[i][0][0][0]
+            y = contours[i][0][0][1]
+
+            temp_image = np.array(train_dotted_image)
+                        
+            mask = np.zeros((th, tw))
+            mask = cv2.circle(mask, (x, y), radious_list[c], CONST_WHITE_COLOR, -1)
+
+            mask = mask.astype(np.uint8)
+
+            _, mask_contour, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+            if (len(mask_contour) != 1):
+                continue
+
+            x, y, w, h = cv2.boundingRect(mask_contour[0])
+
+            if (h < h_threshold) or (w < w_threshold):
+                print("Skiping contour!")
+                continue
+
+            if (take_train_dotted == True):
+                lion = train_dotted_image[y:(y + h), x:(x + w), :]
+                dotted_lion = lion
+            else:
+                lion = train_image[y:(y + h), x:(x + w), :] 
+                dotted_lion = train_dotted_image[y:(y + h), x:(x + w), :]
+
+            # The dotted image is needed to count the labels.
+            lions_count = count_lions_in_a_single_lion_image(dotted_lion, counting_radious=5, counting_dot_threshold=1)
+
+            # Extract a random patch from the image and check is there are any lions.
+            # If not accept it. If not search for another one.
+            while (True):
+                x = random.randint(0, tw - 1)
+                y = random.randint(0, th - 1)
+
+                if (take_train_dotted == True):
+                    earth = train_dotted_image[y:(y + h), x:(x + w), :]
+                    dotted_earth = earth
+                else:
+                    earth = train_image[y:(y + h), x:(x + w), :]
+                    dotted_earth = train_dotted_image[y:(y + h), x:(x + w), :]
+                
+                # The dotted image is needed to count the labels (in this case we expect no labels).
+                earth_lion_count = count_lions_in_a_single_lion_image(dotted_earth, counting_radious=5, counting_dot_threshold=1)
+                if (sum(earth_lion_count) > 0):
+                    continue
+                else:
+                    break
+
+            sea_lion_images.append([lion, lions_count, earth])
+
+    return sea_lion_images
+
+
 def count_lions_in_a_lion_images_list(lion_images_list, counting_radious=15, counting_dot_threshold=1):
     
     n_images = len(lion_images_list)
@@ -1551,8 +1649,8 @@ def prepare_and_dispatch_lion_counting_data(train_image_filename_list,
     for n in range(n_images):
         print(train_image_filename_list[n])
 
-        filename_stem = get_filename_stem(train_image_filename_list[i])
-        is_valid = check_image_validity(filename_stem, invalid_images_list)        
+        filename_stem = get_filename_stem(train_image_filename_list[n])
+        is_valid = check_image_validity(filename_stem, invalid_images_list)    
         if (is_valid == False):
             print("Image %s is invalid! Skipping!" % (filename_stem))
             continue

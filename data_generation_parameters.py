@@ -7,10 +7,11 @@ import working_directory_definition as wdd
 
 
 data_dir = sys.argv[1]
-version = sys.argv[2]
+preprocessed_top_dir = sys.argv[2]
+version = sys.argv[3]
 
 
-directories = wdd.save_current_version(data_dir, version)
+directories = wdd.save_current_version(data_dir, preprocessed_top_dir, version)
 
 parameters_filename = directories["PARAMETERS_FILENAME"]
 

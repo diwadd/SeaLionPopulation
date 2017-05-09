@@ -8,6 +8,7 @@ import sys
 import numpy as np
 
 from keras import backend as K
+from keras.models import load_model
 import keras_detection_model_definitions as kdmd
 
 import data_handling_and_preparation as dhap
@@ -34,7 +35,7 @@ def train_model(model,
         print("Epoch: %d" % (i))
         for b in range(number_of_image_loads):
             progress = (b + 1)/number_of_image_loads
-            print("Batch: %f" % (progress), end="\r")
+            #print("Batch: %f" % (progress), end="\r")
             mini_batch_fnl = x_train_fnl[ptr:(ptr + n_image_to_load_at_once)]
             ptr = ptr + n_image_to_load_at_once
 
@@ -48,12 +49,13 @@ def train_model(model,
             print("n_batches_per_load: " + str(n_batches_per_load))
             batch_ptr = 0
             for k in range(n_batches_per_load):
+                print("Global Epoch: %d, image load: %d, processes image load %f, k: %d, processes mini batch %f" % (i, b, progress, k, (k+1)/n_batches_per_load))
                 # A chunk of the chunk will we loaded with fit into the GPU.
                 x_train = x_data[batch_ptr:(batch_ptr + mini_batch_size), :, :]
                 y_train = y_data[batch_ptr:(batch_ptr + mini_batch_size), :]
 
-                print("x_train: " + str(x_train.shape))
-                print("y_train: " + str(y_train.shape))
+                #print("x_train: " + str(x_train.shape))
+                #print("y_train: " + str(y_train.shape))
 
                 batch_ptr = batch_ptr + n_batches_per_load
                 #model.train_on_batch(x_train, y_train)
@@ -62,7 +64,7 @@ def train_model(model,
                           batch_size=1,
                           shuffle=False)
 
-        print()
+        #print()
 
     return model
 
@@ -106,13 +108,18 @@ print("ih: %d, iw: %d, ic: %d, mh: %d, mw: %d" % (ih, iw, ic, mh, mw))
 
 
 K.get_session()
-model = kdmd.DetectionNeuralNetworkModelTrainSmall2(ih, iw, ic, mh, mw)
+
+model = None
+if (os.path.isfile(detection_model_filename) == True):
+    model = load_model(detection_model_filename)
+else:
+    model = kdmd.DetectionNeuralNetworkModelTrainSmall2(ih, iw, ic, mh, mw)
 
 
 model = train_model(model,
                     x_train_fnl,
-                    n_epochs=10,
-                    n_image_to_load_at_once=1000,
+                    n_epochs=30,
+                    n_image_to_load_at_once=2000,
                     mini_batch_size=100)
 
 
