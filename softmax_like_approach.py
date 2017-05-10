@@ -3,9 +3,11 @@ import glob
 import sys
 
 import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+
 import data_handling_and_preparation as dhap
 
-import matplotlib.pyplot as plt
 
 def plot_image(img):
     plt.subplots()
@@ -20,7 +22,8 @@ def dispatch_images(train_dir,
                     nw, 
                     nh,
                     radious_list=[24, 24, 24, 12, 10],
-                    take_train_dotted=False):
+                    take_train_dotted=False,
+                    save_jpg=False):
 
     train_image_list = glob.glob(train_dir + "*.jpg")
     train_dotted_image_list = glob.glob(train_dotted_dir + "*.jpg")
@@ -33,7 +36,9 @@ def dispatch_images(train_dir,
 
     for n in range(n_train_images):
 
-        if (n != 1):
+        print("Processed: " + str( (n + 1) / n_train_images ))
+
+        if (n > 2):
             continue
 
         train_stem = dhap.get_filename_stem(train_image_list[n])
@@ -53,6 +58,11 @@ def dispatch_images(train_dir,
             print("Image shapes are not compitable! Skiping!")
             continue
 
+        NEAR_ZERO_THRESHOLD = 1
+        gray_image = cv2.cvtColor(train_dotted_image.astype(np.uint8), cv2.COLOR_BGR2GRAY)
+        _, mask = cv2.threshold(gray_image, NEAR_ZERO_THRESHOLD, 255, cv2.THRESH_BINARY)
+        mask = mask/255.0
+        train_image = dhap.apply_mask(train_image, mask)
 
         sea_lion_images = dhap.softmax_dispatch_count_lions_in_a_single_lion_image(train_image,
                                                                                    train_dotted_image,
@@ -72,8 +82,22 @@ def dispatch_images(train_dir,
                         str(sea_lion_images[i][1][2]) + "_" + \
                         str(sea_lion_images[i][1][3]) + "_" + \
                         str(sea_lion_images[i][1][4]) + "_" + "0"
-            cv2.imwrite(data_dir + "lion_image_filestem_" + train_stem + "_id_" + str(i) + "_label_" + label_str + "1.jpg", image_for_save)
-            cv2.imwrite(data_dir + "earth_image_filestem_" + train_stem + "_id_" + str(i) + "_label_0_0_0_0_0_11.jpg", earth_image)
+
+            if (save_jpg == True):
+                cv2.imwrite(data_dir + "lion_image_filestem_" + train_stem + "_id_" + str(i) + "_label_" + label_str + ".jpg", image_for_save)
+                cv2.imwrite(data_dir + "earth_image_filestem_" + train_stem + "_id_" + str(i) + "_label_0_0_0_0_0_1.jpg", earth_image)
+
+            fn = data_dir + "lion_image_filestem_" + train_stem + "_id_" + str(i) + "_label_" + label_str + ".npz"
+            labels = sea_lion_images[i][1]/np.sum(sea_lion_images[i][1])
+            labels = np.reshape(labels, (1, -1))     
+            np.savez_compressed(fn, 
+                                image=image_for_save.astype(np.float32)/255.0, 
+                                labels=labels)
+
+            fn = data_dir + "earth_image_filestem_" + train_stem + "_id_" + str(i) + "_label_0_0_0_0_0_1.npz"
+            np.savez_compressed(fn, 
+                                image=earth_image.astype(np.float32)/255.0, 
+                                labels=np.array([[0.0 , 0.0, 0.0, 0.0, 0.0, 1.0]]))
 
 
 
@@ -97,7 +121,8 @@ if (__name__ == "__main__"):
                     nw=nw,
                     nh=nh,
                     radious_list=radious_list,
-                    take_train_dotted=True)
+                    take_train_dotted=False,
+                    save_jpg=False)
 
 
 

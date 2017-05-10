@@ -343,7 +343,10 @@ def count_lions_in_a_single_lion_image(lion_image, counting_radious=10, counting
     """
 
     color_list = CONST_COLOR_LIST
-    lions_count = [0, 0, 0, 0, 0]
+    
+    # Plus one more element than in color_list because of
+    # earth images in the softmax approach.
+    lions_count = [0, 0, 0, 0, 0, 0]
 
     for c in range(len(color_list)):
 
@@ -459,6 +462,7 @@ def softmax_dispatch_count_lions_in_a_single_lion_image(train_image,
                 else:
                     break
 
+            lions_count = np.array(lions_count)
             sea_lion_images.append([lion, lions_count, earth])
 
     return sea_lion_images
