@@ -1,6 +1,8 @@
 import os
 import sys
 import glob
+import random
+import math
 
 import cv2
 import numpy as np
@@ -106,6 +108,7 @@ def train_model(model,
     return model
 
 
+
 if __name__ == "__main__":
     print("Preparing to train model...")
 
@@ -138,8 +141,8 @@ if __name__ == "__main__":
     model = train_model(model,
                         filename_list,
                         n_epochs=10,
-                        n_image_to_load_at_once=1000,
-                        mini_batch_size=100)
+                        n_image_to_load_at_once=2000,
+                        mini_batch_size=1000)
 
 
 

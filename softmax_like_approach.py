@@ -18,7 +18,9 @@ def plot_image(img):
 
 def dispatch_images(train_dir, 
                     train_dotted_dir, 
-                    data_dir, 
+                    data_dir,
+                    lb,
+                    ub, 
                     nw, 
                     nh,
                     radious_list=[24, 24, 24, 12, 10],
@@ -34,15 +36,18 @@ def dispatch_images(train_dir,
     if (n_train_images != n_train_dotted_images):
         sys.exit("ERROR in dispatch_images: Number of loaded train and train dotted images do not agree!")
 
+
+    print("Number of images: " + str(n_train_images))
     for n in range(n_train_images):
 
-        print("Processed: " + str( (n + 1) / n_train_images ))
+        print("n: " + str(n) + " processed: " + str( (n + 1) / n_train_images ))
 
-        if (n > 2):
+        if ( n < lb ) or ( n > ub ):
             continue
 
         train_stem = dhap.get_filename_stem(train_image_list[n])
         train_dotted_stem = dhap.get_filename_stem(train_dotted_image_list[n])
+
 
         if (train_stem != train_dotted_stem):
             sys.exit("ERROR in dispatch_images: File stems do not agree!")
@@ -106,18 +111,32 @@ if (__name__ == "__main__"):
     top_dir = "/home/tadek/Coding/Kaggle/SeaLionPopulation/"
     train_dir = "/media/tadek/My_Passport/Kaggle.com/SeaLionPopulation/Kaggle-NOAA-SeaLions_FILES/Train/"
     train_dotted_dir = "/media/tadek/My_Passport/Kaggle.com/SeaLionPopulation/Kaggle-NOAA-SeaLions_FILES/TrainDotted/"
-    data_dir = "/home/tadek/Coding/Kaggle/SeaLionPopulation/temp_data/"
+    data_dir = "/home/tadek/Coding/Kaggle/SeaLionPopulation/temp_data_28_28_28_16_12/"
 
-    dhap.check_if_dir_exists_create_it_if_not_remove_content(data_dir)
+    #dhap.check_if_dir_exists_create_it_if_not_remove_content(data_dir)
 
-    nw = 32
-    nh = 32
+    #lb = 1
+    #ub = 20
+
+    #lb = 21
+    #ub = 100
+
+    #lb = 101
+    #ub = 201
+
+    lb = 0
+    ub = 948
+
+    nw = 33
+    nh = 33
     # radious_list=[24, 24, 24, 12, 10]
     radious_list=[28, 28, 28, 16, 12]
 
     dispatch_images(train_dir,
                     train_dotted_dir,
-                    data_dir, 
+                    data_dir,
+                    lb,
+                    ub, 
                     nw=nw,
                     nh=nh,
                     radious_list=radious_list,

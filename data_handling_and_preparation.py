@@ -1796,6 +1796,54 @@ def load_lion_counting_files(filename_list, fraction=1.0):
     return x_data, y_data
 
 
+def load_single_lion_file(filename):
+    """
+    Load a single files that has been dispatched by
+    softmax_like_approach.py
+
+    """
+
+    file_exists = os.path.exists(filename)
+    if (file_exists == False):
+        sys.exit("ERROR! The file path you provided does not exist!")
+
+    loaded_data = np.load(filename)
+
+    image = loaded_data["image"]
+    labels = loaded_data["labels"]
+
+    return image, labels
+
+
+def load_lion_files(filename_list, fraction=1.0):
+
+    n_files = len(filename_list)
+    if (n_files == 0):
+        sys.exit("ERROR: filename_list is empty.")
+
+    image, labels = load_single_lion_file(filename_list[0])
+    ih, iw, ic = image.shape
+    _, nl = labels.shape
+
+    x_data = np.zeros((n_files, ih, iw, ic))
+    y_data = np.zeros((n_files, nl))
+
+    x_data[0, :, :, :] = image
+    y_data[0, :] = labels
+
+    print("Total number of files: %d" % (n_files))
+    for n in range(1, int(fraction*n_files)):
+        print("Loading files... " + str( (n+1) / n_files ), end="\r" )
+        image, labels = load_single_lion_file(filename_list[n])
+
+        x_data[n, :, :, :] = image
+        y_data[n, :] = labels
+    print("All files loaded!")
+
+    return x_data, y_data
+
+
+
 def load_train_test_data_trainsmall2(directories,
                                      test_size=0.2,
                                      validation_size=0.5,
