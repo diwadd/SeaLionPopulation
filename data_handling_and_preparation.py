@@ -21,7 +21,6 @@ from sklearn.model_selection import train_test_split
 import working_directory_definition as wdd
 
 # red: adult males
-# magenta: subadult males
 # brown: adult females
 # blue: juveniles
 # green: pups
@@ -1721,7 +1720,7 @@ def load_single_lion_detection_file(filename):
 
 
 @measure_time
-def load_lion_detection_files(filename_list, fraction=1.0):
+def load_lion_detection_files(filename_list, fraction=1.0, shuffle=0):
 
     n_files = len(filename_list)
     if (n_files == 0):
@@ -1736,6 +1735,9 @@ def load_lion_detection_files(filename_list, fraction=1.0):
 
     x_data[0, :, :, :] = image
     y_data[0, :, :] = mask
+
+    if (shuffle == 1):
+        random.shuffle(filename_list)
 
     for n in range(1, int(fraction*n_files)):
         image, mask = load_single_lion_detection_file(filename_list[n])
@@ -1815,7 +1817,7 @@ def load_single_lion_file(filename):
     return image, labels
 
 
-def load_lion_files(filename_list, fraction=1.0):
+def load_lion_files(filename_list, fraction=1.0, shuffle=0):
 
     n_files = len(filename_list)
     if (n_files == 0):
@@ -1830,6 +1832,9 @@ def load_lion_files(filename_list, fraction=1.0):
 
     x_data[0, :, :, :] = image
     y_data[0, :] = labels
+
+    if (shuffle == 1):
+        random.shuffle(filename_list)
 
     print("Total number of files: %d" % (n_files))
     for n in range(1, int(fraction*n_files)):

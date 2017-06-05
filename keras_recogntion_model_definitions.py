@@ -46,7 +46,7 @@ def RecognitionNeuralNetworkModelSmall(ih, iw, ic, nl):
 
 
     """
-    dropout = 0.5
+    dropout = 0.1
 
     model = Sequential()
     model.add(Conv2D(32, kernel_size=(3, 3), activation="relu", input_shape=(ih, iw, ic)))
@@ -55,19 +55,19 @@ def RecognitionNeuralNetworkModelSmall(ih, iw, ic, nl):
     model.add(Dropout(dropout))
     
 
-    model.add(Conv2D(64, (3, 3), activation="relu"))
+    model.add(Conv2D(32, (3, 3), activation="relu"))
     model.add(BatchNormalization())
     model.add(MaxPooling2D(pool_size=(2, 2)))
     model.add(Dropout(dropout))
 
-    model.add(Conv2D(64, (3, 3), activation="relu"))
+    model.add(Conv2D(32, (3, 3), activation="relu"))
     model.add(BatchNormalization())
     model.add(MaxPooling2D(pool_size=(2, 2)))
     model.add(Dropout(dropout))
 
 
     model.add(Flatten())
-    model.add(Dense(128, activation="relu"))
+    model.add(Dense(32, activation="relu"))
     #model.add(Dropout(0.5))
 
     model.add(Dense((nl), activation="softmax"))
@@ -89,18 +89,18 @@ def RecognitionNeuralNetworkModelLarge(ih, iw, ic, nl):
     Refs: https://arxiv.org/pdf/1511.06422.pdf
 
     """
-    dropout = 0.8
+    dropout = 0.1
 
     model = Sequential()
     model.add(Conv2D(16, kernel_size=(3, 3), activation="relu", padding="same", input_shape=(ih, iw, ic)))
     model.add(BatchNormalization())
     model.add(Dropout(dropout))
     
-    model.add(Conv2D(16, kernel_size=(3, 3), activation="relu", padding="same"))
+    model.add(Conv2D(32, kernel_size=(3, 3), activation="relu", padding="same"))
     model.add(BatchNormalization())
     model.add(Dropout(dropout))
 
-    model.add(Conv2D(16, kernel_size=(3, 3), activation="relu", padding="same"))
+    model.add(Conv2D(32, kernel_size=(3, 3), activation="relu", padding="same"))
     model.add(BatchNormalization())
     model.add(MaxPooling2D(pool_size=(2, 2)))
     model.add(Dropout(dropout))
@@ -119,7 +119,7 @@ def RecognitionNeuralNetworkModelLarge(ih, iw, ic, nl):
     model.add(Dropout(dropout))
 
     model.add(Flatten())
-    model.add(Dense(512, activation="relu"))
+    model.add(Dense(32, activation="relu"))
     #model.add(Dropout(0.5))
 
     model.add(Dense((nl), activation="softmax"))
@@ -133,4 +133,64 @@ def RecognitionNeuralNetworkModelLarge(ih, iw, ic, nl):
 
     return model
 
+
+
+def RecognitionNeuralNetworkModelLarge49(ih, iw, ic, nl):
+    """
+
+    Refs: https://arxiv.org/pdf/1511.06422.pdf
+
+    """
+    dropout = 0.1
+
+    model = Sequential()
+    model.add(Conv2D(16, kernel_size=(3, 3), activation="relu", padding="same", input_shape=(ih, iw, ic)))
+    model.add(BatchNormalization())
+    model.add(Dropout(dropout))
+    
+    model.add(Conv2D(32, kernel_size=(3, 3), activation="relu", padding="same"))
+    model.add(BatchNormalization())
+    model.add(Dropout(dropout))
+
+    model.add(Conv2D(32, kernel_size=(3, 3), activation="relu", padding="same"))
+    model.add(BatchNormalization())
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+    model.add(Dropout(dropout))
+
+    model.add(Conv2D(32, kernel_size=(3, 3), activation="relu", padding="same"))
+    model.add(BatchNormalization())
+    model.add(Dropout(dropout))
+    
+    model.add(Conv2D(32, kernel_size=(3, 3), activation="relu", padding="same"))
+    model.add(BatchNormalization())
+    model.add(Dropout(dropout))
+
+    model.add(Conv2D(32, kernel_size=(3, 3), activation="relu", padding="same"))
+    model.add(BatchNormalization())
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+    model.add(Dropout(dropout))
+
+    model.add(Conv2D(32, kernel_size=(3, 3), activation="relu", padding="same"))
+    model.add(BatchNormalization())
+    model.add(Dropout(dropout))
+
+    model.add(Conv2D(32, kernel_size=(3, 3), activation="relu", padding="same"))
+    model.add(BatchNormalization())
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+    model.add(Dropout(dropout))
+
+    model.add(Flatten())
+    model.add(Dense(64, activation="relu"))
+    #model.add(Dropout(0.5))
+
+    model.add(Dense((nl), activation="softmax"))
+
+    model.compile(loss="categorical_crossentropy",
+                  optimizer="adadelta",
+                  metrics=["accuracy"])
+
+    print("\n ---> Model summary <--- \n")
+    model.summary()
+
+    return model
 
