@@ -112,7 +112,10 @@ def train_model(model,
 if __name__ == "__main__":
     print("Preparing to train model...")
 
-    data_dir = "/home/tadek/Coding/Kaggle/SeaLionPopulation/temp_data/"
+    #data_dir = "/home/tadek/Coding/Kaggle/SeaLionPopulation/temp_data/"
+    #model_filename = "/home/tadek/Coding/Kaggle/SeaLionPopulation/softmax_model.h5"
+    
+    data_dir = "/home/tadek/Coding/Kaggle/SeaLionPopulation/temp_data_32_32_32_32_32/"
     model_filename = "/home/tadek/Coding/Kaggle/SeaLionPopulation/softmax_model.h5"
     filename_list = glob.glob(data_dir + "*.npz")
 
@@ -135,14 +138,14 @@ if __name__ == "__main__":
     #    model = load_model(model_filename)
     #else:
     #model = krmd.TestRecognitionNeuralNetworkModel(ih, iw, ic, nl)
-    model = krmd.RecognitionNeuralNetworkModelTrainSmall2(ih, iw, ic, nl)
-
+    #model = krmd.RecognitionNeuralNetworkModelTrainSmall2(ih, iw, ic, nl)
+    model = krmd.RecognitionNeuralNetworkModelSmall(ih, iw, ic, nl)
 
     model = train_model(model,
                         filename_list,
                         n_epochs=10,
                         n_image_to_load_at_once=2000,
-                        mini_batch_size=1000)
+                        mini_batch_size=100)
 
 
 

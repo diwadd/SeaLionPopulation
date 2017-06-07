@@ -45,7 +45,7 @@ if __name__ == "__main__":
 
     random_state = random.randint(1, int(math.pow(2,32)))
 
-    x_data, y_data = dhap.load_lion_files(filename_list, fraction=0.5, shuffle=1)
+    x_data, y_data = dhap.load_lion_files(filename_list, fraction=1.0, shuffle=1)
 
 
     # There are 16160 images of subadult males.
@@ -114,8 +114,8 @@ if __name__ == "__main__":
         vertical_flip=False) # randomly flip images
 
 
-    #model = krmd.RecognitionNeuralNetworkModelSmall(ih, iw, ic, nl)
-    model = krmd.RecognitionNeuralNetworkModelLarge49(ih, iw, ic, nl)
+    model = krmd.RecognitionNeuralNetworkModelSmall(ih, iw, ic, nl)
+    #model = krmd.RecognitionNeuralNetworkModelLarge49(ih, iw, ic, nl)
 
     batch_size = 100
     model.fit_generator(datagen.flow(x_train, y_train,
