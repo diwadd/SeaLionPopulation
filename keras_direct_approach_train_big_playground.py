@@ -9,7 +9,7 @@ import numpy as np
 
 from keras import backend as K
 from keras.models import load_model
-import keras_detection_model_definitions as kdmd
+import keras_direct_approach_model_definitions as kdmd
 
 import data_handling_and_preparation as dhap
 from data_handling_and_preparation import SAP
@@ -69,6 +69,24 @@ def train_model(model,
     return model
 
 
+def custom_generator(file_name_list, noli=10):
+    # noli - number of loaded images per yield
+
+    while True:
+        n = len(file_name_list)
+        number_of_image_loads = round(n / noli)
+        ptr = 0
+        # print("n: " + str(n))
+        # print("number_of_image_loads: " + str(number_of_image_loads))
+
+        for i in range(number_of_image_loads):
+            # print("We are a i: " + str(i))
+            # create numpy arrays of input data
+            # and labels, from each line in the file
+            mini_batch_fnl = file_name_list[ptr:(ptr + noli)]
+
+            x_data, y_data = dhap.load_lion_direct_approach_files(mini_batch_fnl)
+            yield (x_data, y_data)
 
 
 top_dir = os.path.dirname(os.path.abspath(__file__)) + "/"
@@ -88,6 +106,43 @@ train_test_filenames = dhap.filename_list_train_test_split(filename_list)
 x_train_fnl = train_test_filenames[0]
 x_validation_fnl = train_test_filenames[1]
 x_test_fnl = train_test_filenames[2]
+
+print("Number of files for training: " + str(len(x_train_fnl)))
+print("Number of files for validation: " + str(len(x_validation_fnl)))
+print("Number of files for tesring: " + str(len(x_test_fnl)))
+
+#data = custom_generator(x_train_fnl)
+#data = tuple(data)
+
+#x_data = data[0][0]
+#y_data = data[0][1]
+#print("x_data.shape " + str(x_data.shape))
+#print("y_data.shape " + str(y_data.shape))
+
+f = open(directories["PARAMETERS_FILENAME"], "rb")
+parameters = pickle.load(f)
+f.close()
+
+ih = parameters["resize_image_patch_to_h"]
+iw = parameters["resize_image_patch_to_w"]
+ic = 3 # number of channels in image
+mh = dhap.CONST_NUMBER_OF_CLASSES
+
+K.get_session()
+
+model = kdmd.DetectionNeuralNetworkModelTrainSmall2(ih, iw, ic, mh)
+
+noli = 10
+n = len(x_train_fnl)
+number_of_image_loads = round(n / noli)
+
+model.fit_generator(custom_generator(x_train_fnl),
+                    steps_per_epoch=number_of_image_loads,
+                    epochs=10)
+
+K.clear_session()
+
+"""
 
 print("x_train len: %s" % (str(len(x_train_fnl))))
 print("x_validation len: %s" % (str(len(x_validation_fnl))))
@@ -133,4 +188,5 @@ model.save(detection_model_filename)
 
 K.clear_session()
 
+"""
 

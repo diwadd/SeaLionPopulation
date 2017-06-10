@@ -79,19 +79,32 @@ if __name__ == "__main__":
 
     print("Preparing sea lion detection training data.")
 
+    """
     dhap.direct_approach_full_input_image(train_image_filename_list[0], 
                                      train_dotted_image_filename_list[0],
                                      patch_h=500,
                                      patch_w=500,
                                      resize_image_patch_to_h=256,
                                      resize_image_patch_to_w=256,
-                                     resize_mask_patch_to_h=64,
-                                     resize_mask_patch_to_w=64,
                                      radious_list = [32, 32, 32, 16, 32],
                                      sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)],
-                                     interactive_plot=False,
-                                     display_every=10)
+                                     interactive_plot=True)
+    """
 
+
+    dhap.prepare_and_dispatch_lion_direct_approach_data(train_image_filename_list, 
+                                                        train_dotted_image_filename_list,
+                                                        preprocessed_detection_data_dir, # data are saved in the detection dir
+                                                        invalid_images_list,
+                                                        patch_h=500,
+                                                        patch_w=500,
+                                                        resize_image_patch_to_h=256,
+                                                        resize_image_patch_to_w=256,
+                                                        radious_list = [32, 32, 32, 16, 32],
+                                                        sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)],
+                                                        interactive_plot=False,
+                                                        display_every=10,
+                                                        direct_approach=False)
 
     """
     prepare_and_dispatch_lion_detection_data(train_image_filename_list, 

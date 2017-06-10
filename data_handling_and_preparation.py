@@ -1085,7 +1085,11 @@ def count_lions_in_images_in_pathes_list(patches_list, counting_radious=10, coun
             # count_lions_in_a_single_lion_image is a function for the softmax approach.
             # Here we reuse it. It has one more class than in the original problem.
             # We take all the values appart this last class.
-            lion_count_patches_list[i][j] = np.array(single_image_count_list[0:CONST_NUMBER_OF_CLASSES])
+            counts = np.array(single_image_count_list[0:CONST_NUMBER_OF_CLASSES])
+            # reshape from (5,) to (5, 1)
+            #counts = np.reshape(counts, (-1))
+            #print("counts.shape " + str(counts.shape))
+            lion_count_patches_list[i][j] = counts
     
     return lion_count_patches_list
 
@@ -1462,117 +1466,6 @@ def prepare_single_full_input_image(train_image_filename,
     return collection_of_resized_mask_patches_lists, collection_of_resized_image_patches_lists
 
 
-
-
-def direct_approach_full_input_image(train_image_filename, 
-                                     train_dotted_image_filename,
-                                     patch_h=500,
-                                     patch_w=500,
-                                     resize_image_patch_to_h=256,
-                                     resize_image_patch_to_w=256,
-                                     resize_mask_patch_to_h=64,
-                                     resize_mask_patch_to_w=64,
-                                     radious_list = [32, 32, 32, 16, 32],
-                                     sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)],
-                                     interactive_plot=False,
-                                     display_every=10):
-
-    """
-    This function prepares the data for the sea lion detection neural network in the direct approach.
-    It takes two files as input:
-    - train_image_filename - is a file from the Train folder.
-    - train_dotted_image_filename - is a file to the corresponding image in the TrainDotted folder.
-    The file names must be given with full paths e.g.
-    train_image_filename = /full/path/to/image/image_name.jpg
-
-    The function returns:
-    - collection_of_resized_image_patches_lists - a collection of lists of image patches with 
-                                                  dimensions (resize_image_patch_to_h x resize_image_patch_to_w) each.
-    - collection_of_resized_count_patches_lists - a collection of lists of count patches with dimensions 
-                                                  (number of classes x 1) each.
-
-    """
-
-    train_filename_stem = get_filename_stem(train_image_filename)
-    train_dotted_filename_stem = get_filename_stem(train_dotted_image_filename)
-
-    if (train_filename_stem != train_dotted_filename_stem):
-        sys.exit("ERROR! Filename stems do not agree.")
-
-    train_image = cv2.imread(train_image_filename)
-    train_dotted_image = cv2.imread(train_dotted_image_filename)
-
-    NEAR_ZERO_THRESHOLD = 1
-    gray_image = cv2.cvtColor(train_dotted_image.astype(np.uint8), cv2.COLOR_BGR2GRAY)
-    _, mask = cv2.threshold(gray_image, NEAR_ZERO_THRESHOLD, 255, cv2.THRESH_BINARY)
-    mask = mask/255.0
-    train_image = apply_mask(train_image, mask)
-
-    if (train_image.shape != train_dotted_image.shape):
-        sys.exit("ERROR! Train and train dotted image shapes do not agree.")
-
-    image_patches_list = slice_the_image_into_patches(train_image, patch_h, patch_w)
-    resized_image_patches_list = resize_patches_in_patches_list(image_patches_list, 
-                                                                resize_image_patch_to_h, 
-                                                                resize_image_patch_to_w)
-
-
-    counts_patches_list = slice_the_image_into_patches(train_dotted_image, patch_h, patch_w)
-    collection_of_counts_patches_lists = create_collection_of_rotated_patches_lists(counts_patches_list, sap_list)
-
-    collection_of_image_patches_lists = create_collection_of_rotated_patches_lists(image_patches_list, sap_list)
-    collection_of_resized_image_patches_lists = create_collection_of_rotated_patches_lists(resized_image_patches_list, sap_list)
-    collection_of_counts_patches_lists = count_lions_in_images_in_patches_lists_collection(collection_of_counts_patches_lists, counting_radious=10, counting_dot_threshold=1)
-
-    """
-
-    if (interactive_plot == True):
-
-        back_resized_mask_patches_list = resize_patches_in_patches_list(resized_mask_patches_list, patch_h, patch_w)
-        masked_dotted_image_patches_list = slice_the_image_into_patches(masked_lion_image, patch_h, patch_w)
-        images_masked_with_resized_patches_list = apply_mask_patches_list_to_image_patches_list(back_resized_mask_patches_list,
-                                                                                                image_patches_list)
-
-
-        collection_of_back_resized_mask_patches_lists = create_collection_of_rotated_patches_lists(back_resized_mask_patches_list, sap_list)
-        collection_of_masked_dotted_image_patches_lists = create_collection_of_rotated_patches_lists(masked_dotted_image_patches_list, sap_list)
-        collection_of_images_masked_with_resized_patches_lists = create_collection_of_rotated_patches_lists(images_masked_with_resized_patches_list, sap_list)
-
-        n_pl_in_collection = len(collection_of_images_masked_with_resized_patches_lists)
-        print("Number of patches_lists: %d" % (n_pl_in_collection))
-        for c in range(n_pl_in_collection):
-            nh_slices, nw_slices = get_patches_list_dimensions(collection_of_images_masked_with_resized_patches_lists[c])
-
-            print("Collection: %d, Number of patches: %d" % (c + 1, nh_slices*nw_slices))
-            every_index = 0
-            for index_i in range(nh_slices):
-                for index_j in range(nw_slices):
-
-                    # For a quick inspection we just need to see a few image.
-                    if (every_index % display_every != 0):
-                        every_index += 1
-                        continue
-
-                    ipl = collection_of_image_patches_lists[c][index_i][index_j]
-                    ripl = collection_of_resized_image_patches_lists[c][index_i][index_j]
-                    mdipl = collection_of_masked_dotted_image_patches_lists[c][index_i][index_j]
-                    mpl = collection_of_mask_patches_lists[c][index_i][index_j]
-                    rmpl = collection_of_resized_mask_patches_lists[c][index_i][index_j]
-                    brmpl = collection_of_back_resized_mask_patches_lists[c][index_i][index_j]
-                    imwrpl = collection_of_images_masked_with_resized_patches_lists[c][index_i][index_j]
-                    sap = sap_list[c]
-
-                    display_images_and_masks_in_patches_list(ipl, ripl, mdipl, mpl, rmpl, brmpl, imwrpl, sap)
-                    every_index += 1
-                
-        #combined_image_masked_with_resized_patches_list = combine_pathes_into_image(images_masked_with_resized_patches_list)
-        #get_detected_lions_list(combined_image_masked_with_resized_patches_list, dot_threshold=1)
-
-    return collection_of_resized_mask_patches_lists, collection_of_resized_image_patches_lists
-
-    """
-
-
 def check_if_dir_exists_create_it_if_not_remove_content(preprocessed_data_dir):
     """
     A helper function used mainly by:
@@ -1638,8 +1531,7 @@ def prepare_and_dispatch_lion_detection_data(train_image_filename_list,
                                              radious_list = [32, 32, 32, 16, 32],
                                              sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)],
                                              interactive_plot=False,
-                                             display_every=10,
-                                             direct_approach=False):
+                                             display_every=10):
 
     """
     Takes a list of the train images and the train images with color dots.
@@ -1681,12 +1573,7 @@ def prepare_and_dispatch_lion_detection_data(train_image_filename_list,
         filename_stem = preprocessed_data_dir + filename_stem + "_prep_data"
 
 
-        if (direct_approach == False):
-            savez_patches_list_collection(filename_stem, cm, ci)
-        else:
-
-            print("Get labes for collection of patches lists")
-
+        savez_patches_list_collection(filename_stem, cm, ci)
 
         print("Processed: %f %% files." % ( 100.0*((i + 1)/n_files) ))
     print()
@@ -1852,6 +1739,144 @@ def prepare_and_dispatch_lion_counting_data(train_image_filename_list,
     print()
 
 
+
+def direct_approach_full_input_image(train_image_filename, 
+                                     train_dotted_image_filename,
+                                     patch_h=500,
+                                     patch_w=500,
+                                     resize_image_patch_to_h=256,
+                                     resize_image_patch_to_w=256,
+                                     radious_list = [32, 32, 32, 16, 32],
+                                     sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)],
+                                     interactive_plot=False,
+                                     display_every=10):
+
+    """
+    This function prepares the data for the sea lion detection neural network in the direct approach.
+    It takes two files as input:
+    - train_image_filename - is a file from the Train folder.
+    - train_dotted_image_filename - is a file to the corresponding image in the TrainDotted folder.
+    The file names must be given with full paths e.g.
+    train_image_filename = /full/path/to/image/image_name.jpg
+
+    The function returns:
+    - collection_of_resized_image_patches_lists - a collection of lists of image patches with 
+                                                  dimensions (resize_image_patch_to_h x resize_image_patch_to_w) each.
+    - collection_of_resized_count_patches_lists - a collection of lists of count patches with dimensions 
+                                                  (number of classes x 1) each.
+
+    """
+
+    train_filename_stem = get_filename_stem(train_image_filename)
+    train_dotted_filename_stem = get_filename_stem(train_dotted_image_filename)
+
+    if (train_filename_stem != train_dotted_filename_stem):
+        sys.exit("ERROR! Filename stems do not agree.")
+
+    train_image = cv2.imread(train_image_filename)
+    train_dotted_image = cv2.imread(train_dotted_image_filename)
+
+    NEAR_ZERO_THRESHOLD = 1
+    gray_image = cv2.cvtColor(train_dotted_image.astype(np.uint8), cv2.COLOR_BGR2GRAY)
+    _, mask = cv2.threshold(gray_image, NEAR_ZERO_THRESHOLD, 255, cv2.THRESH_BINARY)
+    mask = mask/255.0
+    train_image = apply_mask(train_image, mask)
+
+    if (train_image.shape != train_dotted_image.shape):
+        sys.exit("ERROR! Train and train dotted image shapes do not agree.")
+
+    image_patches_list = slice_the_image_into_patches(train_image, patch_h, patch_w)
+    resized_image_patches_list = resize_patches_in_patches_list(image_patches_list, 
+                                                                resize_image_patch_to_h, 
+                                                                resize_image_patch_to_w)
+
+
+    dotted_image_patches_list = slice_the_image_into_patches(train_dotted_image, patch_h, patch_w)
+
+    collection_of_resized_image_dotted_patches_lists = create_collection_of_rotated_patches_lists(dotted_image_patches_list, sap_list)    
+    collection_of_counts_patches_lists = create_collection_of_rotated_patches_lists(dotted_image_patches_list, sap_list)
+
+    # collection_of_image_patches_lists = create_collection_of_rotated_patches_lists(resized_image_patches_list, sap_list)
+    collection_of_resized_image_patches_lists = create_collection_of_rotated_patches_lists(resized_image_patches_list, sap_list)
+    collection_of_counts_patches_lists = count_lions_in_images_in_patches_lists_collection(collection_of_counts_patches_lists, counting_radious=10, counting_dot_threshold=1)
+
+
+    if (interactive_plot == True):
+
+        n_pl_in_collection = len(collection_of_resized_image_dotted_patches_lists)
+        for c in range(n_pl_in_collection):
+            nh_slices, nw_slices = get_patches_list_dimensions(collection_of_resized_image_dotted_patches_lists[c])
+
+            print("Collection: %d, Number of patches: %d" % (c + 1, nh_slices*nw_slices))
+            every_index = 0
+            for index_i in range(nh_slices):
+                for index_j in range(nw_slices):
+
+                    img = collection_of_resized_image_dotted_patches_lists[c][index_i][index_j]
+                    plt.subplots()
+                    plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+                    plt.title(str(collection_of_counts_patches_lists[c][index_i][index_j]))
+                    plt.colorbar()
+                    plt.show()
+
+    return collection_of_counts_patches_lists, collection_of_resized_image_patches_lists
+
+
+def prepare_and_dispatch_lion_direct_approach_data(train_image_filename_list, 
+                                                   train_dotted_image_filename_list,
+                                                   preprocessed_data_dir,
+                                                   invalid_images_list,
+                                                   patch_h=500,
+                                                   patch_w=500,
+                                                   resize_image_patch_to_h=256,
+                                                   resize_image_patch_to_w=256,
+                                                   radious_list = [32, 32, 32, 16, 32],
+                                                   sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)],
+                                                   interactive_plot=False,
+                                                   display_every=10,
+                                                   direct_approach=False):
+
+    """
+    Takes a list of the train images and the train images with color dots.
+    Prepares the data for training according to the provided parameters 
+    and saves them in preprocessed_data_dir.
+ 
+    """
+
+    check_if_dir_exists_create_it_if_not_remove_content(preprocessed_data_dir)
+
+    n_files = len(train_image_filename_list)
+    #print("Processed: 0.0 %% files.", end="\r")
+    for i in range(n_files):
+
+        filename_stem = get_filename_stem(train_image_filename_list[i])
+        is_valid = check_image_validity(filename_stem, invalid_images_list)        
+        if (is_valid == False):
+            print("Image %s is invalid! Skipping!" % (filename_stem))
+            continue
+
+        print(train_image_filename_list[i])
+        cc, ci = direct_approach_full_input_image(train_image_filename_list[i], 
+                                                  train_dotted_image_filename_list[i],
+                                                  patch_h=patch_h,
+                                                  patch_w=patch_w,
+                                                  resize_image_patch_to_h=resize_image_patch_to_h,
+                                                  resize_image_patch_to_w=resize_image_patch_to_w,
+                                                  radious_list=radious_list,
+                                                  sap_list=sap_list,
+                                                  interactive_plot=interactive_plot,
+                                                  display_every=display_every)
+
+
+        filename_stem = get_filename_stem(train_image_filename_list[i])
+        filename_stem = preprocessed_data_dir + filename_stem + "_prep_data"
+
+        savez_patches_list_collection(filename_stem, cc, ci)
+
+        print("Processed: %f %% files." % ( 100.0*((i + 1)/n_files) ))
+    print()
+
+
 # --- ----------------------------------------- ---
 # Functions for loading the dispatched data
 # into the training models.
@@ -1920,6 +1945,41 @@ def load_lion_detection_files(filename_list, fraction=1.0, shuffle=0):
 
         x_data[n, :, :, :] = image
         y_data[n, :, :] = mask
+
+    return x_data, y_data
+
+# @measure_time
+def load_lion_direct_approach_files(filename_list, fraction=1.0, shuffle=0):
+
+    n_files = len(filename_list)
+    if (n_files == 0):
+        sys.exit("ERROR: filename_list is empty.")
+
+    image, mask = load_single_lion_detection_file(filename_list[0])
+    # print("Mask shape: " + str(mask.shape))
+    ih, iw, ic = image.shape
+    mh = mask.shape[0]
+
+    x_data = np.zeros((n_files, ih, iw, ic))
+    y_data = np.zeros((n_files, mh))
+
+    x_data[0, :, :, :] = image
+    y_data[0, :] = mask
+
+    if (shuffle == 1):
+        random.shuffle(filename_list)
+
+    for n in range(1, int(fraction*n_files)):
+        image, mask = load_single_lion_detection_file(filename_list[n])
+
+        #image = image.reshape((1, ih, iw, ic))
+        #mask = mask.reshape((1, mh, mw))
+
+        #x_data = np.concatenate((x_data, image))
+        #y_data = np.concatenate((y_data, mask))
+
+        x_data[n, :, :, :] = image
+        y_data[n, :] = mask
 
     return x_data, y_data
 
