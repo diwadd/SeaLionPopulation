@@ -8,12 +8,11 @@ def root_mean_squared_error(y_true, y_pred):
     return K.sqrt(K.mean(K.square(y_pred - y_true), axis=-1))
 
 
-def TestDetectionNeuralNetworkModel(ih, iw, ic, mh):
+def TestDetectionNeuralNetworkModel(ih, iw, ic, mh, loss=root_mean_squared_error):
     """
     A simple model used to test the machinery.
     ih, iw, ic - describe the dimensions of the input image
     mh, mw - describe the dimensions of the output mask
-
 
     """
 
@@ -32,7 +31,7 @@ def TestDetectionNeuralNetworkModel(ih, iw, ic, mh):
 
     model.add(Dense((mh), activation="sigmoid"))
 
-    model.compile(loss="binary_crossentropy",
+    model.compile(loss=loss,
                   optimizer="adadelta",
                   metrics=["accuracy"])
 
@@ -42,7 +41,7 @@ def TestDetectionNeuralNetworkModel(ih, iw, ic, mh):
     return model
 
 
-def DetectionNeuralNetworkModelTrainSmall2(ih, iw, ic, mh):
+def DetectionNeuralNetworkModelTrainSmall2(ih, iw, ic, mh, loss=root_mean_squared_error):
     """
     A simple model used to test the machinery on TrainSmall2.
     ih, iw, ic - describe the dimensions of the input image
@@ -79,9 +78,9 @@ def DetectionNeuralNetworkModelTrainSmall2(ih, iw, ic, mh):
     model.add(BatchNormalization())
     model.add(Dropout(dropout))
 
-    model.add(Dense((mh), activation="sigmoid"))
+    model.add(Dense(mh))
 
-    model.compile(loss=root_mean_squared_error,
+    model.compile(loss=loss,
                   optimizer="adadelta",
                   metrics=["accuracy"])
 

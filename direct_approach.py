@@ -100,7 +100,6 @@ if __name__ == "__main__":
                                                         patch_w=500,
                                                         resize_image_patch_to_h=256,
                                                         resize_image_patch_to_w=256,
-                                                        radious_list = [32, 32, 32, 16, 32],
                                                         sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)],
                                                         interactive_plot=False,
                                                         display_every=10,

@@ -89,10 +89,35 @@ def custom_generator(file_name_list, noli=10):
             yield (x_data, y_data)
 
 
+
+def evaluate_model(file_name_list, model, noli=10):
+    n = len(file_name_list)
+    number_of_image_loads = round(n / noli)
+    ptr = 0
+    # print("n: " + str(n))
+    # print("number_of_image_loads: " + str(number_of_image_loads))
+
+    s = 0
+    n_rows = 0
+    for i in range(number_of_image_loads):
+        # print("We are a i: " + str(i))
+        # create numpy arrays of input data
+        # and labels, from each line in the file
+        mini_batch_fnl = file_name_list[ptr:(ptr + noli)]
+
+        x_data, y_data = dhap.load_lion_direct_approach_files(mini_batch_fnl)
+
+        y_pred = model.predict(x_data)
+
+        s = s + np.sum((y_data - y_pred)*(y_data - y_pred))
+        n_rows = n_rows + x_data.shape[0]
+    return np.sqrt(s/n_rows)
+
+
 top_dir = os.path.dirname(os.path.abspath(__file__)) + "/"
 directories = dhap.get_current_version_directory(top_dir)
 
-detection_model_filename = directories["PARAMETERS_DIRECTORY"] + "detection_model.h5"
+detection_model_filename = directories["PARAMETERS_DIRECTORY"] + "counting_model.h5"
 
 
 print("Data directory:\n " + str(directories["PREPROCESSED_DETECTION_DATA_DIRECTORY"]))
@@ -138,7 +163,16 @@ number_of_image_loads = round(n / noli)
 
 model.fit_generator(custom_generator(x_train_fnl),
                     steps_per_epoch=number_of_image_loads,
-                    epochs=10)
+                    epochs=5)
+
+
+x_data, y_data = dhap.load_lion_direct_approach_files(x_test_fnl)
+print("Validating model on custom test data...")
+# loss = model.evaluate(x_data, y_data)
+loss = evaluate_model(x_validation_fnl, model, noli=10)
+print("Loss: " + str(loss))
+
+model.save(detection_model_filename)
 
 K.clear_session()
 
