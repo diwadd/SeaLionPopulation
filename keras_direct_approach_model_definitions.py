@@ -49,7 +49,7 @@ def DetectionNeuralNetworkModelTrainSmall2(ih, iw, ic, mh, loss=root_mean_square
 
 
     """
-    dropout = 0.8
+    dropout = 0.5
 
     model = Sequential()
     model.add(Conv2D(32, kernel_size=(3, 3), activation="relu", input_shape=(ih, iw, ic)))
@@ -73,8 +73,18 @@ def DetectionNeuralNetworkModelTrainSmall2(ih, iw, ic, mh, loss=root_mean_square
     model.add(MaxPooling2D(pool_size=(2, 2)))
     model.add(Dropout(dropout))
 
+    model.add(Conv2D(64, (3, 3), activation="relu"))
+    model.add(BatchNormalization())
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+    model.add(Dropout(dropout))
+
+    model.add(Conv2D(64, (3, 3), activation="relu"))
+    model.add(BatchNormalization())
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+    model.add(Dropout(dropout))
+
     model.add(Flatten())
-    model.add(Dense(256, activation="relu"))
+    model.add(Dense(128, activation="relu"))
     model.add(BatchNormalization())
     model.add(Dropout(dropout))
 

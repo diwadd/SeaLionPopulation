@@ -70,7 +70,12 @@ def train_model(model,
 
 
 def custom_generator(file_name_list, noli=10):
-    # noli - number of loaded images per yield
+    
+    """
+    noli - number of loaded images per yield
+    
+
+    """
 
     while True:
         n = len(file_name_list)
@@ -84,8 +89,11 @@ def custom_generator(file_name_list, noli=10):
             # create numpy arrays of input data
             # and labels, from each line in the file
             mini_batch_fnl = file_name_list[ptr:(ptr + noli)]
+            ptr = ptr + noli
 
             x_data, y_data = dhap.load_lion_direct_approach_files(mini_batch_fnl)
+
+            # print("y_data: " + str(y_data))
             yield (x_data, y_data)
 
 
@@ -105,11 +113,16 @@ def evaluate_model(file_name_list, model, noli=10):
         # and labels, from each line in the file
         mini_batch_fnl = file_name_list[ptr:(ptr + noli)]
 
-        x_data, y_data = dhap.load_lion_direct_approach_files(mini_batch_fnl)
+        x_data, y_true = dhap.load_lion_direct_approach_files(mini_batch_fnl)
 
         y_pred = model.predict(x_data)
 
-        s = s + np.sum((y_data - y_pred)*(y_data - y_pred))
+        print("y_true:")
+        print(y_true)
+        print("y_pred: ")
+        print(y_pred)
+
+        s = s + np.sum((y_true - y_pred)*(y_true - y_pred))
         n_rows = n_rows + x_data.shape[0]
     return np.sqrt(s/n_rows)
 
@@ -161,9 +174,9 @@ noli = 10
 n = len(x_train_fnl)
 number_of_image_loads = round(n / noli)
 
-model.fit_generator(custom_generator(x_train_fnl),
+model.fit_generator(custom_generator(x_train_fnl, noli=noli),
                     steps_per_epoch=number_of_image_loads,
-                    epochs=5)
+                    epochs=30)
 
 
 x_data, y_data = dhap.load_lion_direct_approach_files(x_test_fnl)
@@ -176,51 +189,6 @@ model.save(detection_model_filename)
 
 K.clear_session()
 
-"""
-
-print("x_train len: %s" % (str(len(x_train_fnl))))
-print("x_validation len: %s" % (str(len(x_validation_fnl))))
-print("x_test len: %s" % (str(len(x_test_fnl))))
-
-print("\n\n ===> ---- <=== \n\n")
 
 
-f = open(directories["PARAMETERS_FILENAME"], "rb")
-parameters = pickle.load(f)
-f.close()
-
-
-ih = parameters["resize_image_patch_to_h"]
-iw = parameters["resize_image_patch_to_w"]
-ic = 3 # number of channels in image
-
-mh = parameters["resize_mask_patch_to_h"]
-mw = parameters["resize_mask_patch_to_w"]
-
-print("ih: %d, iw: %d, ic: %d, mh: %d, mw: %d" % (ih, iw, ic, mh, mw))
-
-
-K.get_session()
-
-model = None
-if (os.path.isfile(detection_model_filename) == True):
-    model = load_model(detection_model_filename)
-else:
-    model = kdmd.DetectionNeuralNetworkModelTrainSmall2(ih, iw, ic, mh, mw)
-
-
-model = train_model(model,
-                    x_train_fnl,
-                    n_epochs=30,
-                    n_image_to_load_at_once=2000,
-                    mini_batch_size=100)
-
-
-
-
-model.save(detection_model_filename)
-
-K.clear_session()
-
-"""
 

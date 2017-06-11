@@ -1,5 +1,6 @@
 import pickle
 import os
+import sys
 
 import cv2
 import numpy as np
@@ -59,14 +60,14 @@ def reshape_patches_list(patches_list,
 
 
 def count_sea_lions_in_image(filename,
-                              model,
-                              patch_h,
-                              patch_w,
-                              resize_image_patch_to_h, 
-                              resize_image_patch_to_w,
-                              resize_mask_patch_to_h,
-                              resize_mask_patch_to_w,
-                              display_mask=False):
+                             model,
+                             patch_h,
+                             patch_w,
+                             resize_image_patch_to_h, 
+                             resize_image_patch_to_w,
+                             resize_mask_patch_to_h,
+                             resize_mask_patch_to_w,
+                             display_mask=False):
 
     """
     Take a filename, reads the image, slices the image into a
@@ -76,7 +77,7 @@ def count_sea_lions_in_image(filename,
 
     """
 
-    train_image = cv2.imread(filename)
+    train_image = cv2.imread(filename)/255.0
     image_patches_list = dhap.slice_the_image_into_patches(train_image, patch_h, patch_w)
 
     # Recombine the image from the patches (train_image.shape != image.shape)
@@ -96,8 +97,13 @@ def count_sea_lions_in_image(filename,
 
     nh_slices, nw_slices = dhap.get_patches_list_dimensions(counts_patches_list)
 
+    # Get the number of lions in each patch and
+    # add them to the lion sum.
+    # lion_sum is the predicted number of lions
+    # in the image.
     for i in range( nh_slices ):
-        for j in range( nw_slices ):  
+        for j in range( nw_slices ):
+            # print(counts_patches_list[i][j])  
             lion_sum = lion_sum + counts_patches_list[i][j]
 
 
@@ -111,7 +117,29 @@ def count_sea_lions_in_image(filename,
         plt.axis("off")
         plt.show()
 
+    return lion_sum
 
+
+def make_labels_data_dict(labels_filename):
+
+    """
+    Read the csv files that contains the labels and
+    store them in a dict.
+
+    """
+
+    labels_dict = {}
+    labels = dhap.read_csv(labels_filename)
+
+    for i in range(len(labels)):
+
+        row = [int(labels[i][j]) for j in range(len(labels[i]))]
+        labels_dict[row[0]] = np.array(row[1:]).astype(np.float32)
+
+    #for keys, values in labels_dict.items():
+    #    print(str(keys) + " : " + str(values))      
+
+    return labels_dict
 
 
 if __name__ == '__main__':
@@ -158,23 +186,41 @@ if __name__ == '__main__':
 
     #filename = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall/Train/1.jpg"
     filename = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall2/Train/48.jpg"
+    stem = int(dhap.get_filename_stem(filename))
 
-    count_sea_lions_in_image(filename,
-                             model,
-                             patch_h,
-                             patch_w,
-                             resize_image_patch_to_h, 
-                             resize_image_patch_to_w,
-                             resize_mask_patch_to_h,
-                             resize_mask_patch_to_w,
-                             display_mask=True)
+    labels_filename = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall2/Train/train.csv"
+
+    labels_dict = make_labels_data_dict(labels_filename)
+
+    lion_sum = count_sea_lions_in_image(filename,
+                                        model,
+                                        patch_h,
+                                        patch_w,
+                                        resize_image_patch_to_h, 
+                                        resize_image_patch_to_w,
+                                        resize_mask_patch_to_h,
+                                        resize_mask_patch_to_w,
+                                        display_mask=True)
+
+    y_true = labels_dict[stem]
+    y_pred = lion_sum
+
+    print("y_true:")
+    print(y_true)
+    print("y_pred: ")
+    print(y_pred)
+
+    loss = K.eval(root_mean_squared_error(y_true, y_pred))
+    print("\nLoss for image " + str(stem) + ".jpg is " + str(loss) + "\n")
+
+
+    # a = np.array([ [1,2,3,4], [4,5,6,7], [2,3,4,50], [9,8,7,6], [2,2,2,2]]).astype(np.float32)
+    # b = np.array([ [1,5,3,4], [3,5,6,7], [7,6,4,34], [4,6,7,8], [3,3,3,3]]).astype(np.float32)
+    # loss = K.eval(root_mean_squared_error(a, b))
+    # print(loss)
+
 
     K.clear_session()
-
-
-
-
-
 
 
 

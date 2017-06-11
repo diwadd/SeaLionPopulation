@@ -51,6 +51,8 @@ if (__name__ == "__main__"):
     image, labels = load_single_lion_file(sys.argv[1], "mask")
 
     plot_image(image, str(labels))
+
+    print(image)
     print(labels)
 
 
