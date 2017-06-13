@@ -639,7 +639,7 @@ def slice_the_image_into_patches(image,
             try:  
                 patches_list[i][j][:,:,:] = resized_image[(i*patch_h):(i*patch_h + patch_h), (j*patch_w):(j*patch_w + patch_w), :]
             except IndexError:
-                patches_list[i][j][:,:] = resized_image[(i*patch_h):(i*patch_h + patch_h), (j*patch_w):(j*patch_w + patch_w)]   
+                patches_list[i][j][:,:] = resized_image[(i*patch_h):(i*patch_h + patch_h), (j*patch_w):(j*patch_w + patch_w)]
 
     return patches_list
 
@@ -1161,6 +1161,7 @@ def savez_two_patches_list(filename_stem, mask_patches_list, image_patches_list)
     if (nh_slices_m != nh_slices_i) or (nw_slices_m != nw_slices_i):
         sys.exit("Patches_lists dimension mismatch!")
 
+    counter = 0
     for i in range(nh_slices_m):
         for j in range(nw_slices_m):
             # The image vaules are reduced to a [0, 1] interval.
@@ -1171,8 +1172,16 @@ def savez_two_patches_list(filename_stem, mask_patches_list, image_patches_list)
 
             # If mask has no 1.0 entires then there are no lions in the image.
             # We skip such an image (there should be at least one non zero pixel).
+            # The number of patches without lions is large.
+            # We need to limit it.
             if (mask_sum < 1.0):
-                continue
+                # We save every empty patch when counter == skip.
+                skip = 8
+                if (counter < skip):
+                    counter = counter + 1
+                    continue
+                else:
+                    counter = 0
 
 
             fn = filename_stem + "_patches_list_i_" + str(i) + "_j_" + str(j) + ".npz"

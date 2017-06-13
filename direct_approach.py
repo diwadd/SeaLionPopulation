@@ -91,6 +91,25 @@ if __name__ == "__main__":
                                      interactive_plot=True)
     """
 
+    sap_list=[SAP(  0.0, 1.0),
+              #SAP( 30.0, 1.0),
+              #SAP( 45.0, 1.0),
+              SAP( 90.0, 1.0),
+              #SAP(180.0, 1.0),
+              #SAP(270.0, 1.0),
+              SAP(  0.0, 0.9),
+              #SAP( 30.0, 0.9),
+              #SAP( 45.0, 0.9),
+              SAP( 90.0, 0.9),
+              #SAP(180.0, 0.9),
+              #SAP(270.0, 0.9),
+              SAP(  0.0, 1.1),
+              #SAP( 30.0, 1.1),
+              #SAP( 45.0, 1.1),
+              SAP( 90.0, 1.1),
+              #SAP(180.0, 1.1),
+              #SAP(270.0, 1.1)
+             ]
 
     dhap.prepare_and_dispatch_lion_direct_approach_data(train_image_filename_list, 
                                                         train_dotted_image_filename_list,
@@ -98,9 +117,10 @@ if __name__ == "__main__":
                                                         invalid_images_list,
                                                         patch_h=500,
                                                         patch_w=500,
-                                                        resize_image_patch_to_h=256,
-                                                        resize_image_patch_to_w=256,
-                                                        sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)],
+                                                        resize_image_patch_to_h=144,
+                                                        resize_image_patch_to_w=144,
+                                                        # sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)],
+                                                        sap_list=sap_list,
                                                         interactive_plot=False,
                                                         display_every=10,
                                                         direct_approach=False)

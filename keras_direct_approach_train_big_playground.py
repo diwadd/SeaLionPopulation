@@ -40,10 +40,10 @@ def train_model(model,
             ptr = ptr + n_image_to_load_at_once
 
             # Read a chunk of the data into RAM.
-            x_data, y_data = dhap.load_lion_detection_files(mini_batch_fnl)
+            x_data, y_data = dhap.load_lion_direct_approach_files(mini_batch_fnl)
 
-            mn, mh, mw = y_data.shape
-            y_data = np.reshape(y_data, (mn, mh * mw))
+            mn, mh = y_data.shape
+            y_data = np.reshape(y_data, (mn, mh))
 
             n_batches_per_load = round(mn / mini_batch_size)
             print("n_batches_per_load: " + str(n_batches_per_load))
@@ -117,10 +117,10 @@ def evaluate_model(file_name_list, model, noli=10):
 
         y_pred = model.predict(x_data)
 
-        print("y_true:")
-        print(y_true)
-        print("y_pred: ")
-        print(y_pred)
+        #print("y_true:")
+        #print(y_true)
+        #print("y_pred: ")
+        #print(y_pred)
 
         s = s + np.sum((y_true - y_pred)*(y_true - y_pred))
         n_rows = n_rows + x_data.shape[0]
@@ -173,17 +173,28 @@ model = kdmd.DetectionNeuralNetworkModelTrainSmall2(ih, iw, ic, mh)
 noli = 10
 n = len(x_train_fnl)
 number_of_image_loads = round(n / noli)
+n_epochs = 120
+n_sub_epochs = 1
+# Total number of epoch is equal to n_epochs x n_sub_epochs.
 
-model.fit_generator(custom_generator(x_train_fnl, noli=noli),
-                    steps_per_epoch=number_of_image_loads,
-                    epochs=30)
+for i in range(n_epochs):
+    print("Progress: " + str((i + 1)/n_epochs))
+    model.fit_generator(custom_generator(x_train_fnl, noli=noli),
+                        steps_per_epoch=number_of_image_loads,
+                        epochs=n_sub_epochs)
+
+    # model = train_model(model,
+    #            x_train_fnl,
+    #            n_epochs=30,
+    #            n_image_to_load_at_once=3000,
+    #            mini_batch_size=400)
 
 
-x_data, y_data = dhap.load_lion_direct_approach_files(x_test_fnl)
-print("Validating model on custom test data...")
-# loss = model.evaluate(x_data, y_data)
-loss = evaluate_model(x_validation_fnl, model, noli=10)
-print("Loss: " + str(loss))
+    x_data, y_data = dhap.load_lion_direct_approach_files(x_test_fnl)
+    print("Validating model on custom test data...")
+    # loss = model.evaluate(x_data, y_data)
+    loss = evaluate_model(x_validation_fnl, model, noli=10)
+    print("Loss: " + str(loss))
 
 model.save(detection_model_filename)
 

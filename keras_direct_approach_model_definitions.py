@@ -5,7 +5,7 @@ from keras.layers import Conv2D, MaxPooling2D
 from keras import backend as K
 
 def root_mean_squared_error(y_true, y_pred):
-    return K.sqrt(K.mean(K.square(y_pred - y_true), axis=-1))
+    return K.sqrt(K.mean(K.square(y_pred - y_true)))
 
 
 def TestDetectionNeuralNetworkModel(ih, iw, ic, mh, loss=root_mean_squared_error):
@@ -78,10 +78,10 @@ def DetectionNeuralNetworkModelTrainSmall2(ih, iw, ic, mh, loss=root_mean_square
     model.add(MaxPooling2D(pool_size=(2, 2)))
     model.add(Dropout(dropout))
 
-    model.add(Conv2D(64, (3, 3), activation="relu"))
-    model.add(BatchNormalization())
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-    model.add(Dropout(dropout))
+    #model.add(Conv2D(64, (3, 3), activation="relu"))
+    #model.add(BatchNormalization())
+    #model.add(MaxPooling2D(pool_size=(2, 2)))
+    #model.add(Dropout(dropout))
 
     model.add(Flatten())
     model.add(Dense(128, activation="relu"))

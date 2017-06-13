@@ -33,6 +33,11 @@ def apply_model_to_image_patches_list(image_patches_list, model):
             ih, iw, ic = image_patches_list[i][j].shape
 
             x_image = np.reshape(image_patches_list[i][j], (1, ih, iw, ic))
+
+            # Patches list is in uint8 format with
+            # values from 0 to 255.
+            # The model expects floats from 0.0 to 1.0.
+            x_image = x_image.astype(np.float32)/255.0
             output_patches_list[i][j] = model.predict(x_image, batch_size=1, verbose=0)
 
     return output_patches_list
@@ -77,13 +82,15 @@ def count_sea_lions_in_image(filename,
 
     """
 
-    train_image = cv2.imread(filename)/255.0
+    train_image = (cv2.imread(filename).astype(np.float32))
     image_patches_list = dhap.slice_the_image_into_patches(train_image, patch_h, patch_w)
 
     # Recombine the image from the patches (train_image.shape != image.shape)
     # bacause the size of the image is adjusted to be a multiple of patch_h and patch_w.    
     image = dhap.combine_pathes_into_image(image_patches_list)
 
+    # Convert to uint8 for cv2.cvtColor.    
+    #image = image.astype(np.uint8)
 
     # Resize the patches to the ones used by the model.
     image_patches_list = dhap.resize_patches_in_patches_list(image_patches_list, 
@@ -108,7 +115,7 @@ def count_sea_lions_in_image(filename,
 
 
 
-    print("Number of lions in image: " + str(lion_sum))
+    # print("Number of lions in image: " + str(lion_sum))
 
     if (display_mask == True):
         fig, ax = plt.subplots()
@@ -118,6 +125,35 @@ def count_sea_lions_in_image(filename,
         plt.show()
 
     return lion_sum
+
+
+def count_sea_lions_in_image_list(filename_list,
+                                  model,
+                                  patch_h,
+                                  patch_w,
+                                  resize_image_patch_to_h, 
+                                  resize_image_patch_to_w,
+                                  resize_mask_patch_to_h,
+                                  resize_mask_patch_to_w,
+                                  display_mask=False):
+    
+    n = len(filename_list)
+    y_pred = np.zeros((n, dhap.CONST_NUMBER_OF_CLASSES))
+    
+    for i in range(n):
+        lion_sum = count_sea_lions_in_image(filename_list[i],
+                                            model=model,
+                                            patch_h=patch_h,
+                                            patch_w=patch_w,
+                                            resize_image_patch_to_h=resize_image_patch_to_h, 
+                                            resize_image_patch_to_w=resize_image_patch_to_w,
+                                            resize_mask_patch_to_h=resize_mask_patch_to_h,
+                                            resize_mask_patch_to_w=resize_mask_patch_to_w,
+                                            display_mask=display_mask)
+
+        y_pred[i,:] = np.array(lion_sum)
+
+    return y_pred
 
 
 def make_labels_data_dict(labels_filename):
@@ -140,6 +176,19 @@ def make_labels_data_dict(labels_filename):
     #    print(str(keys) + " : " + str(values))      
 
     return labels_dict
+
+
+def get_y_true(labels_dict, stem_list):
+
+    
+    n = len(stem_list)
+    y_true = np.zeros((n, dhap.CONST_NUMBER_OF_CLASSES))    
+
+    for i in range(n):
+        y_true[i, :] = labels_dict[stem_list[i]]
+        
+    return y_true
+
 
 
 if __name__ == '__main__':
@@ -185,13 +234,21 @@ if __name__ == '__main__':
     print("detection model type: " + str(type(model)))
 
     #filename = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall/Train/1.jpg"
-    filename = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall2/Train/48.jpg"
-    stem = int(dhap.get_filename_stem(filename))
+    filename_1 = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall2/Train/48.jpg"
+    filename_2 = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall2/Train/47.jpg"
+    filename_3 = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall2/Train/46.jpg"
+    filename_list = [filename_1, filename_2, filename_3]
+
+    stem_1 = int(dhap.get_filename_stem(filename_1))
+    stem_2 = int(dhap.get_filename_stem(filename_2))
+    stem_3 = int(dhap.get_filename_stem(filename_3))
+    stem_list = [stem_1, stem_2, stem_3]
+
 
     labels_filename = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall2/Train/train.csv"
-
     labels_dict = make_labels_data_dict(labels_filename)
 
+    """
     lion_sum = count_sea_lions_in_image(filename,
                                         model,
                                         patch_h,
@@ -201,17 +258,27 @@ if __name__ == '__main__':
                                         resize_mask_patch_to_h,
                                         resize_mask_patch_to_w,
                                         display_mask=True)
+    """
+    y_pred = count_sea_lions_in_image_list(filename_list,
+                                           model,
+                                           patch_h,
+                                           patch_w,
+                                           resize_image_patch_to_h, 
+                                           resize_image_patch_to_w,
+                                           resize_mask_patch_to_h,
+                                           resize_mask_patch_to_w,
+                                           display_mask=True)
 
-    y_true = labels_dict[stem]
-    y_pred = lion_sum
+    y_true = get_y_true(labels_dict, stem_list)
 
     print("y_true:")
     print(y_true)
     print("y_pred: ")
     print(y_pred)
 
+
     loss = K.eval(root_mean_squared_error(y_true, y_pred))
-    print("\nLoss for image " + str(stem) + ".jpg is " + str(loss) + "\n")
+    print("\nLoss for image: \n" + str(loss) + "\n")
 
 
     # a = np.array([ [1,2,3,4], [4,5,6,7], [2,3,4,50], [9,8,7,6], [2,2,2,2]]).astype(np.float32)
