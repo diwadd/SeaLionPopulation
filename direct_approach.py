@@ -60,24 +60,6 @@ if __name__ == "__main__":
         print(train_dotted_image_filename_list[i])
     print()
 
-    parameters = {}
-    parameter_file = open(detection_parameters_filename, "rb")
-
-    parameters = pickle.load(parameter_file)
-
-    # Detection data parameters for dispatch.
-    patch_h = parameters["patch_h"]
-    patch_w = parameters["patch_w"]
-    resize_image_patch_to_h = parameters["resize_image_patch_to_h"]
-    resize_image_patch_to_w = parameters["resize_image_patch_to_w"]
-    resize_mask_patch_to_h = parameters["resize_mask_patch_to_h"]
-    resize_mask_patch_to_w = parameters["resize_mask_patch_to_w"]
-    radious_list = parameters["radious_list"]
-    sap_list = parameters["sap_list"]
-    interactive_plot=False
-    display_every=10
-
-    print("Preparing sea lion detection training data.")
 
     """
     dhap.direct_approach_full_input_image(train_image_filename_list[0], 
@@ -91,39 +73,28 @@ if __name__ == "__main__":
                                      interactive_plot=True)
     """
 
-    sap_list=[SAP(  0.0, 1.0),
-              #SAP( 30.0, 1.0),
-              #SAP( 45.0, 1.0),
-              SAP( 90.0, 1.0),
-              #SAP(180.0, 1.0),
-              #SAP(270.0, 1.0),
-              SAP(  0.0, 0.9),
-              #SAP( 30.0, 0.9),
-              #SAP( 45.0, 0.9),
-              SAP( 90.0, 0.9),
-              #SAP(180.0, 0.9),
-              #SAP(270.0, 0.9),
-              SAP(  0.0, 1.1),
-              #SAP( 30.0, 1.1),
-              #SAP( 45.0, 1.1),
-              SAP( 90.0, 1.1),
-              #SAP(180.0, 1.1),
-              #SAP(270.0, 1.1)
-             ]
+    parameters = {}
+    parameter_file = open(detection_parameters_filename, "rb")
+
+    parameters = pickle.load(parameter_file)
+
+    # Detection data parameters for dispatch.
+    patch_h = parameters["patch_h"]
+    patch_w = parameters["patch_w"]
+    resize_image_patch_to_h = parameters["resize_image_patch_to_h"]
+    resize_image_patch_to_w = parameters["resize_image_patch_to_w"]
+    sap_list = parameters["sap_list"]
+
 
     dhap.prepare_and_dispatch_lion_direct_approach_data(train_image_filename_list, 
                                                         train_dotted_image_filename_list,
                                                         preprocessed_detection_data_dir, # data are saved in the detection dir
                                                         invalid_images_list,
-                                                        patch_h=500,
-                                                        patch_w=500,
-                                                        resize_image_patch_to_h=144,
-                                                        resize_image_patch_to_w=144,
-                                                        # sap_list=[SAP(0.0, 1.0), SAP(90.0, 1.0)],
-                                                        sap_list=sap_list,
-                                                        interactive_plot=False,
-                                                        display_every=10,
-                                                        direct_approach=False)
+                                                        patch_h=patch_h,
+                                                        patch_w=patch_w,
+                                                        resize_image_patch_to_h=resize_image_patch_to_h,
+                                                        resize_image_patch_to_w=resize_image_patch_to_w,
+                                                        sap_list=sap_list)
 
     """
     prepare_and_dispatch_lion_detection_data(train_image_filename_list, 

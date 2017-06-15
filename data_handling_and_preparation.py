@@ -901,6 +901,7 @@ def get_data_eigenvalues_and_eigenvectors(filename_list, fraction=1/10):
 
     images_array = np.empty(n_files, dtype=object)
     for f in range(n_files):
+        print(sub_filename_list[f])
         images_array[f] = cv2.imread(sub_filename_list[f])
 
 
@@ -930,7 +931,7 @@ def color_augmentation_of_an_image(image, ew, ev, ca_std=0.2):
 
     """
 
-    image = image/255.0
+    #image = image/255.0
 
     h, w, c = image.shape   
     
@@ -951,7 +952,7 @@ def color_augmentation_of_an_image(image, ew, ev, ca_std=0.2):
     image[image < 0.0] = 0.0
     image[image > 1.0] = 1.0
 
-    image = image*255.0
+    #image = image*255.0
 
     return image
 
