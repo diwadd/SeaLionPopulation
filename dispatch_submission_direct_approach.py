@@ -1,6 +1,7 @@
 import pickle
 import os
 import sys
+import glob
 
 import cv2
 import numpy as np
@@ -139,8 +140,10 @@ def count_sea_lions_in_image_list(filename_list,
     
     n = len(filename_list)
     y_pred = np.zeros((n, dhap.CONST_NUMBER_OF_CLASSES))
-    
+    ids = [j for j in range(n)]    
+
     for i in range(n):
+        print("i: " + str(i) + " out of " + str(n))
         lion_sum = count_sea_lions_in_image(filename_list[i],
                                             model=model,
                                             patch_h=patch_h,
@@ -151,9 +154,10 @@ def count_sea_lions_in_image_list(filename_list,
                                             resize_mask_patch_to_w=resize_mask_patch_to_w,
                                             display_mask=display_mask)
 
+        ids[i] = dhap.get_filename_stem(filename_list[i])
         y_pred[i,:] = np.array(lion_sum)
 
-    return y_pred
+    return y_pred, ids
 
 
 def make_labels_data_dict(labels_filename):
@@ -225,7 +229,7 @@ if __name__ == '__main__':
     rectangle_shape=parameters["rectangle_shape"]
 
 
-    direct_approach_model_hdf5_filename = parameters_directory + "counting_model.h5"
+    direct_approach_model_hdf5_filename = parameters_directory + "counting_model_min_imgnet.h5"
 
     K.get_session()
     model = load_model(direct_approach_model_hdf5_filename)
@@ -237,12 +241,16 @@ if __name__ == '__main__':
     filename_1 = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall2/Train/48.jpg"
     filename_2 = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall2/Train/47.jpg"
     filename_3 = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall2/Train/46.jpg"
-    filename_list = [filename_1, filename_2, filename_3]
+    filename_4 = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall/Train/7.jpg"
+    filename_5 = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall/Train/9.jpg"
+    filename_list = [filename_1, filename_2, filename_3, filename_4, filename_5]
 
     stem_1 = int(dhap.get_filename_stem(filename_1))
     stem_2 = int(dhap.get_filename_stem(filename_2))
     stem_3 = int(dhap.get_filename_stem(filename_3))
-    stem_list = [stem_1, stem_2, stem_3]
+    stem_4 = int(dhap.get_filename_stem(filename_4))
+    stem_5 = int(dhap.get_filename_stem(filename_5))
+    stem_list = [stem_1, stem_2, stem_3, stem_4, stem_5]
 
 
     labels_filename = "/home/tadek/Coding/Kaggle/SeaLionPopulation/TrainSmall2/Train/train.csv"
@@ -259,7 +267,7 @@ if __name__ == '__main__':
                                         resize_mask_patch_to_w,
                                         display_mask=True)
     """
-    y_pred = count_sea_lions_in_image_list(filename_list,
+    y_pred, ids = count_sea_lions_in_image_list(filename_list,
                                            model,
                                            patch_h,
                                            patch_w,
@@ -267,7 +275,7 @@ if __name__ == '__main__':
                                            resize_image_patch_to_w,
                                            resize_mask_patch_to_h,
                                            resize_mask_patch_to_w,
-                                           display_mask=True)
+                                           display_mask=False)
 
     y_true = get_y_true(labels_dict, stem_list)
 
@@ -279,6 +287,63 @@ if __name__ == '__main__':
 
     loss = K.eval(root_mean_squared_error(y_true, y_pred))
     print("\nLoss for image: \n" + str(loss) + "\n")
+
+
+
+    filename_list = glob.glob("/media/tadek/My_Passport/Kaggle.com/SeaLionPopulation/Kaggle-NOAA-SeaLions_FILES/Test/*.jpg")
+
+    # start = 1499
+    # stop = 13500
+
+    start = 13499
+    stop = 20000
+
+    filename_list = filename_list[start:stop:1]
+
+
+    y_pred, ids = count_sea_lions_in_image_list(filename_list,
+                                                model,
+                                                patch_h,
+                                                patch_w,
+                                                resize_image_patch_to_h, 
+                                                resize_image_patch_to_w,
+                                                resize_mask_patch_to_h,
+                                                resize_mask_patch_to_w,
+                                                display_mask=False)
+
+    
+    ids = np.array(ids)
+    ids = np.reshape(ids, (-1, 1))
+
+    print("Test predictions shape:" + str(y_pred.shape))
+    print("Ids predictions shape:" + str(ids.shape))
+
+    output_array = np.hstack((ids, y_pred)).astype(dtype=np.float32)
+    print("output_array shape:" + str(output_array.shape))
+    
+    output_array[output_array < 0.0] = 0.0
+    output_array = output_array[output_array[:, 0].argsort()]
+    print(output_array)
+
+    print("---")
+    y_pred[y_pred < 0.0] = 0.0
+    print(y_pred)
+    n, m = y_pred.shape
+
+    f = open("sub.csv", "a")
+    f.write("test_id,adult_males,subadult_males,adult_females,juveniles,pups\n")
+    for k in range(n):
+        a = str(int(output_array[k,0]))
+        b = str(output_array[k,1])
+        c = str(output_array[k,2])
+        d = str(output_array[k,3])
+        e = str(output_array[k,4])
+        g = str(output_array[k,5])
+
+
+        f.write(a + "," + b + "," + c + "," + d + "," + e + "," + g + "\n")
+
+    f.close()
 
 
     # a = np.array([ [1,2,3,4], [4,5,6,7], [2,3,4,50], [9,8,7,6], [2,2,2,2]]).astype(np.float32)

@@ -23,8 +23,8 @@ parameters["version"] = version
 # Detection data parameters for dispatch.
 patch_h=500
 patch_w=500
-resize_image_patch_to_h=128
-resize_image_patch_to_w=128
+resize_image_patch_to_h=224
+resize_image_patch_to_w=224
 resize_mask_patch_to_h=32
 resize_mask_patch_to_w=32
 radious_list=[24, 24, 24, 14, 24]
@@ -34,8 +34,8 @@ sap_list=[SAP(  0.0, 1.0),
           #SAP( 30.0, 1.0),
           #SAP( 45.0, 1.0),
           SAP( 90.0, 1.0),
-          #SAP(180.0, 1.0),
-          #SAP(270.0, 1.0),
+          SAP(180.0, 1.0),
+          SAP(270.0, 1.0),
           #SAP(  0.0, 0.9),
           #SAP( 30.0, 0.9),
           #SAP( 45.0, 0.9),

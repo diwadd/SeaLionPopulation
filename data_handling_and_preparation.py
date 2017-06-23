@@ -2169,6 +2169,7 @@ def filename_list_train_test_split(filename_list,
     # A chunk of the test set will play the role of a validation set.
     x_validation, x_test, y_validation, y_test = train_test_split(x_test, y_test, test_size=validation_size, random_state=random_state)
 
+
     return x_train, x_validation, x_test, y_train, y_validation, y_test
 
 

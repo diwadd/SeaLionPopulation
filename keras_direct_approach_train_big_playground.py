@@ -93,7 +93,9 @@ def custom_generator(file_name_list, ew, ev, noli=10):
 
             x_data, y_data = dhap.load_lion_direct_approach_files(mini_batch_fnl)
 
-            for j in range(noli):
+            data_size, _, _, _, = x_data.shape
+
+            for j in range(data_size):
                 x_data[j,:,:,:] = dhap.color_augmentation_of_an_image(x_data[j,:,:,:], ew, ev, ca_std=0.2)
 
             # print("y_data: " + str(y_data))
@@ -115,19 +117,23 @@ def evaluate_model(file_name_list, model, noli=10):
         # create numpy arrays of input data
         # and labels, from each line in the file
         mini_batch_fnl = file_name_list[ptr:(ptr + noli)]
+        ptr = ptr + noli
 
         x_data, y_true = dhap.load_lion_direct_approach_files(mini_batch_fnl)
-
         y_pred = model.predict(x_data)
 
         #print("y_true:")
         #print(y_true)
-        #print("y_pred: ")
+        #print("y_pred:")
         #print(y_pred)
 
-        s = s + np.sum((y_true - y_pred)*(y_true - y_pred))
-        n_rows = n_rows + x_data.shape[0]
-    return np.sqrt(s/n_rows)
+        local_loss = np.sqrt(np.sum((y_true - y_pred)*(y_true - y_pred))/y_true.size)
+        #print("local_loss: " + str(local_loss))
+        
+        s = s + local_loss
+        n_rows = n_rows + 1
+    return s/n_rows
+
 
 
 if (__name__ == "__main__"):
@@ -177,17 +183,18 @@ if (__name__ == "__main__"):
 
     K.get_session()
 
-    retrain = False
+    retrain = True
     if (retrain == False):
-        model = kdmd.DetectionNeuralNetworkModelTrainSmall2(ih, iw, ic, mh)
+        #model = kdmd.DetectionNeuralNetworkModelTrainSmall2(ih, iw, ic, mh)
+        model = kdmd.ImageNetTransferModel()
     else:
-        model = load_model(detection_model_filename)
+        model = load_model(directories["PARAMETERS_DIRECTORY"] + "counting_model_min_imgnet.h5")
 
 
     noli = 10
     n = len(x_train_fnl)
     number_of_image_loads = round(n / noli)
-    n_epochs = 180
+    n_epochs = 250
     n_sub_epochs = 1
     # Total number of epoch is equal to n_epochs x n_sub_epochs.
 
@@ -205,13 +212,15 @@ if (__name__ == "__main__"):
         #            mini_batch_size=400)
 
 
-        x_data, y_data = dhap.load_lion_direct_approach_files(x_test_fnl)
+        #x_data, y_data = dhap.load_lion_direct_approach_files(x_test_fnl)
         print("Validating model on custom test data...")
         # loss = model.evaluate(x_data, y_data)
-        loss = evaluate_model(x_validation_fnl, model, noli=10)
+        loss = evaluate_model(x_validation_fnl, model, noli=noli)
+        #loss = evaluate_model(x_train_fnl, model, noli=noli)
+
         if (loss < min_loss):
             min_loss = loss
-            model.save(detection_model_filename.replace(".h5", "_min.h5"))
+            model.save(detection_model_filename.replace(".h5", "_min_imgnet.h5"))
             
 
         print("Loss: " + str(loss))
